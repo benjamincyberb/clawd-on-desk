@@ -1678,6 +1678,71 @@ describe("renderer file-aware idle eye tracking", () => {
   });
 });
 
+describe("renderer state loop sounds", () => {
+  it("wires loop-sound IPC channels in preload and main gate helpers", () => {
+    const preload = readNormalized(PRELOAD);
+    const main = readNormalized(MAIN);
+
+    assert.ok(preload.includes("onLoopSoundConfig"));
+    assert.ok(preload.includes("onLoopSoundState"));
+    assert.ok(preload.includes("loop-sound-config"));
+    assert.ok(preload.includes("loop-sound-state"));
+    assert.ok(main.includes("function syncLoopSoundConfig()"));
+    assert.ok(main.includes("function syncLoopSoundGate()"));
+    assert.ok(main.includes('sendToRenderer("loop-sound-config"'));
+    assert.ok(main.includes('sendToRenderer("loop-sound-state"'));
+    assert.ok(main.includes("syncLoopSoundGate()"));
+    assert.ok(main.includes("getStateSoundUrls"));
+  });
+
+  it("loops knock audio while working and stops on idle", () => {
+    const harness = createRendererHarness();
+    const config = harness.electronHandlers.onLoopSoundConfig;
+    const gate = harness.electronHandlers.onLoopSoundState;
+    const onState = harness.electronHandlers.onStateChange;
+
+    assert.strictEqual(typeof config, "function");
+    assert.strictEqual(typeof gate, "function");
+
+    gate({ enabled: true, volume: 0.4 });
+    config({
+      byState: {
+        working: { sound: "knock", mode: "loop", url: "file:///knock.wav" },
+      },
+    });
+    onState("working", "mortal-working.svg");
+
+    const loopAudio = harness.audioInstances.find((audio) => audio.loop === true);
+    assert.ok(loopAudio);
+    assert.strictEqual(loopAudio.url, "file:///knock.wav");
+    assert.strictEqual(loopAudio.volume, 0.4);
+    assert.ok(loopAudio.playCalls >= 1);
+
+    const pauseBefore = loopAudio.pauseCalls;
+    onState("idle", "mortal-idle.svg");
+    assert.strictEqual(loopAudio.pauseCalls, pauseBefore + 1);
+    assert.strictEqual(loopAudio.loop, false);
+  });
+
+  it("stops loop audio when the gate disables playback", () => {
+    const harness = createRendererHarness();
+    harness.electronHandlers.onLoopSoundState({ enabled: true, volume: 1 });
+    harness.electronHandlers.onLoopSoundConfig({
+      byState: {
+        working: { sound: "knock", mode: "loop", url: "file:///knock.wav" },
+      },
+    });
+    harness.electronHandlers.onStateChange("working", "mortal-working.svg");
+
+    const loopAudio = harness.audioInstances.find((audio) => audio.loop === true && audio.playCalls > 0);
+    assert.ok(loopAudio);
+    const pauseBefore = loopAudio.pauseCalls;
+
+    harness.electronHandlers.onLoopSoundState({ enabled: false, volume: 1 });
+    assert.strictEqual(loopAudio.pauseCalls, pauseBefore + 1);
+  });
+});
+
 describe("renderer glyph flip compensation", () => {
   it("cancels a stale opposite-channel load when the displayed file already matches again", () => {
     const harness = createRendererHarness({

@@ -145,6 +145,26 @@ function createThemeContext(theme, options = {}) {
     return getSoundUrl("confirm") || getSoundUrl("complete") || null;
   }
 
+  function getStateSoundUrls() {
+    if (!theme || !isPlainObject(theme.stateSounds)) return {};
+    const out = {};
+    for (const [stateKey, entry] of Object.entries(theme.stateSounds)) {
+      if (!entry || typeof entry.sound !== "string" || !entry.sound) continue;
+      const url = getSoundUrl(entry.sound);
+      if (!url) continue;
+      out[stateKey] = {
+        sound: entry.sound,
+        mode: entry.mode || "loop",
+        url,
+      };
+    }
+    return out;
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
   return {
     theme,
     resolveAssetPath,
@@ -154,6 +174,7 @@ function createThemeContext(theme, options = {}) {
     getHitRendererConfig,
     getSoundUrl,
     getPreviewSoundUrl,
+    getStateSoundUrls,
   };
 }
 

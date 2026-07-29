@@ -123,9 +123,12 @@ Mini 状态映射：
 ### Sound
 
 - `app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required")` 要在窗口创建前设置
-- `main.js` 里的 `playSound(name)` 会检查 `soundMuted`、`doNotDisturb` 和 cooldown
+- `main.js` 里的 `playSound(name)` 会检查 `soundMuted`、`doNotDisturb` 和 cooldown（一次性通知音）
 - `renderer.js` 用 `_audioCache` 缓存 `Audio` 对象
 - `attention/mini-happy` 播放 complete，`notification/mini-alert` 播放 confirm
+- 主题可选 `stateSounds`：把 display state 映射到 `sounds` 里的逻辑名，目前支持 `mode: "loop"`
+- 循环音走独立通道 `loop-sound-config` / `loop-sound-state`，不受 10s one-shot cooldown 影响；门控为 mute / DND / petHidden / volume
+- 进入/退出状态时由 renderer 的 `onStateChange` 启停；视觉敲击帧与音频循环相位不做精确对齐（已知限制）
 
 ### Eye Tracking
 

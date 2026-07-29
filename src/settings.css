@@ -1568,6 +1568,61 @@ html, body {
   gap: 6px;
   align-items: center;
 }
+.merit-panel {
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  background: rgba(255, 240, 210, 0.04);
+}
+.merit-disclaimer {
+  margin: 0 0 12px;
+  color: var(--muted, #9aa0a6);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.merit-status-box {
+  white-space: pre-line;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.merit-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.merit-debug-row {
+  margin-bottom: 12px;
+}
+.merit-debug-label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.merit-debug-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.merit-debug-select {
+  width: 100%;
+  max-width: 280px;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-family: inherit;
+}
 .theme-card-footer {
   display: flex;
   justify-content: space-between;
@@ -3047,6 +3102,65 @@ html, body {
   gap: 8px;
   flex-wrap: wrap;
   flex-shrink: 0;
+}
+
+.petdex-modal-toolbar {
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.petdex-search-input {
+  flex: 1 1 220px;
+  min-width: 180px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+}
+.petdex-modal-list {
+  min-height: 280px;
+  max-height: 420px;
+}
+.petdex-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.petdex-modal-atlas-frame {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.petdex-modal-atlas-frame img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 800%;
+  height: 900%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  pointer-events: none;
+}
+.petdex-modal-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.petdex-modal-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.petdex-modal-slug {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 /* ── Animation Map reset button ── */

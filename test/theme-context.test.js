@@ -246,6 +246,44 @@ test("sound URLs prefer overrides and external themes fall back to built-in soun
   }
 });
 
+test("getStateSoundUrls resolves loop bindings and skips missing files", () => {
+  const fixture = makeRoot();
+  try {
+    const themeDir = path.join(fixture.root, "themes", "builtin");
+    const overridePath = path.join(fixture.root, "overrides", "knock-override.wav");
+    writeFile(overridePath);
+    writeFile(path.join(fixture.assetsSoundsDir, "knock.wav"));
+
+    const theme = makeTheme({
+      _id: "builtin",
+      _builtin: true,
+      _themeDir: themeDir,
+      sounds: {
+        knock: "knock.wav",
+        missing: "nope.wav",
+      },
+      stateSounds: {
+        working: { sound: "knock", mode: "loop" },
+        thinking: { sound: "missing", mode: "loop" },
+        juggling: { sound: "knock", mode: "loop" },
+      },
+      _soundOverrideFiles: {
+        knock: overridePath,
+      },
+    });
+    const ctx = createThemeContext(theme, fixture);
+    const urls = ctx.getStateSoundUrls();
+
+    assert.deepStrictEqual(Object.keys(urls).sort(), ["juggling", "working"]);
+    assert.strictEqual(urls.working.url, pathToFileURL(overridePath).href);
+    assert.strictEqual(urls.working.sound, "knock");
+    assert.strictEqual(urls.working.mode, "loop");
+    assert.strictEqual(urls.thinking, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("renderer config exposes trusted scripted files only for built-in themes", () => {
   const fixture = makeRoot();
   try {

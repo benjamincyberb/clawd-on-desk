@@ -128,6 +128,7 @@ function createPetWindowRuntime(options = {}) {
   const buildTrayMenu = options.buildTrayMenu || noop;
   const buildContextMenu = options.buildContextMenu || noop;
   const reapplyMacVisibility = options.reapplyMacVisibility || noop;
+  const onPetHiddenChanged = options.onPetHiddenChanged || noop;
   // #640: re-run the editing-overlap dodge whenever the hit geometry syncs —
   // the hitbox can change without the window moving (state switches between
   // hitboxes, theme reload), which changes the overlap answer.
@@ -318,6 +319,7 @@ function createPetWindowRuntime(options = {}) {
     syncPermissionShortcuts();
     buildTrayMenu();
     buildContextMenu();
+    try { onPetHiddenChanged(petHidden); } catch {}
     return { applied: true, deferred: false, changed: true };
   }
 

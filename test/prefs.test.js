@@ -1860,3 +1860,44 @@ describe("prefs.mapLocaleToLang (device locale → UI language)", () => {
     }
   });
 });
+
+describe("prefs.meritProgress", () => {
+  it("defaults meritOverlayEnabled to true and meritProgress to {}", () => {
+    const d = prefs.getDefaults();
+    assert.strictEqual(d.meritOverlayEnabled, true);
+    assert.deepStrictEqual(d.meritProgress, {});
+  });
+
+  it("normalizes meritProgress buckets and drops invalid entries", () => {
+    const out = prefs.validate({
+      meritOverlayEnabled: false,
+      meritProgress: {
+        cultivator: {
+          merit: 1500.9,
+          dayKey: "2026-07-26",
+          dailyEarned: 12,
+          lastActiveDayKey: "2026-07-26",
+          streakDays: 3.2,
+          introSeen: 1,
+          peakStageId: "adept",
+          debugStageId: "bodhisattva",
+        },
+        bad: null,
+        "": { merit: 1 },
+      },
+    });
+    assert.strictEqual(out.meritOverlayEnabled, false);
+    assert.deepStrictEqual(out.meritProgress.cultivator, {
+      merit: 1500,
+      dayKey: "2026-07-26",
+      dailyEarned: 12,
+      lastActiveDayKey: "2026-07-26",
+      streakDays: 3,
+      introSeen: false,
+      peakStageId: "adept",
+      debugStageId: "bodhisattva",
+    });
+    assert.equal("bad" in out.meritProgress, false);
+    assert.equal("" in out.meritProgress, false);
+  });
+});

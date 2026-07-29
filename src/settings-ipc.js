@@ -412,6 +412,18 @@ function registerSettingsIpc(options = {}) {
     }
   });
 
+  handle("settings:get-merit-status", () => {
+    try {
+      if (typeof options.getMeritStatus === "function") {
+        return options.getMeritStatus();
+      }
+      return { enabled: false };
+    } catch (err) {
+      console.warn("Clawd: settings:get-merit-status failed:", err && err.message);
+      return { enabled: false, error: err && err.message };
+    }
+  });
+
   handle("settings:open-user-themes-dir", async () => {
     const dir = typeof themeLoader.ensureUserThemesDir === "function"
       ? themeLoader.ensureUserThemesDir()
@@ -454,6 +466,8 @@ function registerSettingsIpc(options = {}) {
   handle("settings:open-codex-pets-dir", () => codexPetMain.openCodexPetsDir());
   handle("settings:import-codex-pet-zip", (event) => codexPetMain.importCodexPetZip(event));
   handle("settings:remove-codex-pet", (_event, themeId) => codexPetMain.removeCodexPet(themeId));
+  handle("settings:browse-petdex-pets", (_event, query) => codexPetMain.browsePetdexPets({ query }));
+  handle("settings:adopt-petdex-pet", (_event, slug) => codexPetMain.adoptPetdexPet(slug));
 
   handle("settings:confirm-remove-theme", async (event, themeId) => {
     if (typeof themeId !== "string" || !themeId) return { confirmed: false };

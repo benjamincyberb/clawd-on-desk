@@ -7599,7 +7599,7 @@ describe("settings renderer browser environment", () => {
     const preloadSource = fs.readFileSync(PRELOAD_SETTINGS, "utf8");
     const rendererSource = fs.readFileSync(SETTINGS_RENDERER, "utf8");
 
-    assert.ok(html.includes("img-src 'self' data: file:"));
+    assert.ok(html.includes("img-src 'self' data: file: https://assets.petdex.dev"));
     assert.ok(!html.includes("frame-src"));
     assert.ok(html.includes("settings-anim-overrides-merge.js"));
     const themeTabSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-theme.js"), "utf8");

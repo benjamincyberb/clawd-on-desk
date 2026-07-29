@@ -85,6 +85,8 @@ function createSettingsEffectRouter(options = {}) {
   const refreshIdleVisual = options.refreshIdleVisual || noop;
   const rebuildAllMenus = options.rebuildAllMenus || noop;
   const reconcilePowerSaveBlocker = options.reconcilePowerSaveBlocker || noop;
+  const broadcastMeritStatus = options.broadcastMeritStatus || noop;
+  const syncMeritTheme = options.syncMeritTheme || noop;
 
   let started = false;
   let unsubscribeSettings = null;
@@ -301,6 +303,12 @@ function createSettingsEffectRouter(options = {}) {
     }
     if ("idleVisual" in changes) {
       safeCall(logWarn, "Clawd: idle visual refresh failed:", refreshIdleVisual);
+    }
+    if ("meritOverlayEnabled" in changes || "theme" in changes || "meritProgress" in changes) {
+      safeCall(logWarn, "Clawd: merit status broadcast failed:", broadcastMeritStatus);
+    }
+    if ("theme" in changes || "meritProgress" in changes) {
+      safeCall(logWarn, "Clawd: merit theme sync failed:", syncMeritTheme);
     }
 
     // 3. Menu rebuild: only for menu-affecting keys to avoid thrashing on

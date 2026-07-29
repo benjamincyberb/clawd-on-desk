@@ -124,6 +124,8 @@ External themes are treated as untrusted input. SVG files in user themes are san
 
 Do not build a user theme that depends on JavaScript inside SVG files. The built-in Cloudling theme uses `trustedRuntime.scriptedSvgFiles`, but that capability is only honored for themes loaded from Clawd's packaged/repo `themes/` directory. If an external theme declares `trustedRuntime`, Clawd ignores it.
 
+`meritCultivator` (stage progression / merit scoring visuals) is likewise **builtin-only**. External/user themes may declare the block in `theme.json`, but Clawd ignores it: no merit ticker, no progression overlay, and no Settings cultivation panel. Community themes should use normal `variants` for aesthetic swaps, not `meritCultivator`.
+
 ## theme.json Reference
 
 ### Required Fields
@@ -462,20 +464,34 @@ Most third-party themes do not need this. Use `sleepSequence.mode: "direct"` if 
 
 ### Sounds
 
-Themes can map logical sound names to files in a sibling `sounds/` directory:
+Themes can map logical sound names to files in a sibling `sounds/` directory
+(built-in themes resolve from `assets/sounds/`):
 
 ```json
 "sounds": {
   "complete": "complete.mp3",
   "confirm": "confirm.mp3",
+  "knock": "knock.wav",
   "error": "error.ogg"
+},
+"stateSounds": {
+  "working": { "sound": "knock", "mode": "loop" },
+  "juggling": { "sound": "knock", "mode": "loop" },
+  "thinking": { "sound": "knock", "mode": "loop" }
 }
 ```
 
-- Built-in logical names are `complete` and `confirm`
-- Additional names are allowed, but only code paths that call that sound name will play them
+- Built-in one-shot logical names are `complete` and `confirm`
+- Additional names are allowed; one-shot playback still requires a code path that calls `playSound(name)`
+- `stateSounds` is optional and maps a **display state** to a logical sound for continuous playback
+  - `mode: "loop"` (currently the only supported mode) starts when that state is shown and stops on exit
+  - The referenced `sound` must exist in `sounds` (or be a built-in default)
 - Set a sound value to `null` to disable it for the theme
-- User overrides in `Settings...` -> `Animation Overrides` -> `Sounds` are stored separately and do not edit the theme package
+- User overrides in `Settings...` -> `Animation Overrides` -> `Sounds` are stored separately and do not edit the theme package; they also apply to names referenced by `stateSounds`
+- Loop audio is gated by mute, Do Not Disturb, pet-hidden, and volume independently of the one-shot 10s cooldown
+- Visual animation phase and loop audio phase are **not** frame-locked; keep knock samples short (~0.6–0.8s) so they feel close enough to the working cycle
+
+Built-in `assets/sounds/knock.wav` attribution is recorded in `assets/sounds/ATTRIBUTION.md`.
 
 ### Object Scale
 

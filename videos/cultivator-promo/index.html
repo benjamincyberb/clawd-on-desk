@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Cultivator Promo — 日日礼佛，不抱佛脚</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&amp;family=Montserrat:wght@700&amp;family=IBM+Plex+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #17140f;
+      }
+      body {
+        font-family: "Noto Sans SC", "Montserrat", sans-serif;
+        color: #f0e4cc;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      .scene-fill { position: absolute; inset: 0; background: #17140f; }
+      .glow {
+        position: absolute;
+        width: 980px;
+        height: 980px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(212, 168, 75, 0.22) 0%, transparent 68%);
+        pointer-events: none;
+      }
+      .glow-a { left: -140px; top: -200px; }
+      .glow-b {
+        right: -180px;
+        bottom: -240px;
+        background: radial-gradient(circle, rgba(139, 90, 43, 0.24) 0%, transparent 70%);
+      }
+      .glow-finale {
+        left: 50%;
+        top: 42%;
+        width: 1200px;
+        height: 1200px;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(circle, rgba(255, 214, 120, 0.34) 0%, rgba(212, 168, 75, 0.14) 42%, transparent 70%);
+      }
+      .grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.07;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+      .desk-line {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        bottom: 96px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(212, 168, 75, 0.35), transparent);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      .caption {
+        position: absolute;
+        left: 50%;
+        bottom: 88px;
+        transform: translateX(-50%);
+        width: 1680px;
+        text-align: center;
+        font-size: 76px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.18;
+        color: #f0e4cc;
+        text-shadow: 0 4px 28px rgba(0, 0, 0, 0.55);
+        z-index: 5;
+      }
+      .caption-sm {
+        font-size: 58px;
+        font-weight: 700;
+        color: #d4a84b;
+        bottom: 92px;
+      }
+      .pet {
+        position: absolute;
+        width: 680px;
+        height: 680px;
+        object-fit: contain;
+        object-position: center center;
+        image-rendering: auto;
+        filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.45));
+      }
+      .pet-center {
+        left: 50%;
+        top: 46%;
+        transform: translate(-50%, -50%);
+      }
+      .pet-right {
+        right: 70px;
+        top: 58%;
+        width: 540px;
+        height: 540px;
+        transform: translateY(-50%);
+      }
+      .pet-stage {
+        width: 560px;
+        height: 560px;
+        left: 50%;
+        top: 46%;
+        transform: translate(-50%, -50%);
+      }
+      .pet-finale {
+        width: 760px;
+        height: 760px;
+        left: 50%;
+        top: 44%;
+        transform: translate(-50%, -50%);
+        filter: drop-shadow(0 28px 56px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 48px rgba(255, 214, 120, 0.28));
+      }
+      .knock-stack {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .knock-frame {
+        /* stacked; only one visible via opacity */
+      }
+      .stage-layer {
+        position: absolute;
+        inset: 0;
+      }
+      .ghost-deadline {
+        position: absolute;
+        left: 96px;
+        top: 100px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 38px;
+        color: rgba(196, 92, 38, 0.45);
+        letter-spacing: 0.04em;
+        filter: blur(0.6px);
+      }
+      .ghost-err {
+        position: absolute;
+        right: 120px;
+        top: 150px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 26px;
+        color: rgba(196, 92, 38, 0.28);
+        line-height: 1.6;
+        text-align: right;
+        filter: blur(1px);
+      }
+      .terminal {
+        position: absolute;
+        left: 100px;
+        top: 140px;
+        width: 720px;
+        height: 480px;
+        border-radius: 16px;
+        background: rgba(20, 18, 14, 0.92);
+        border: 1px solid rgba(139, 90, 43, 0.45);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        padding: 28px 32px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 24px;
+        line-height: 1.55;
+        color: #6f8f68;
+        overflow: hidden;
+      }
+      .terminal .bar { display: flex; gap: 10px; margin-bottom: 22px; }
+      .terminal .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #8b5a2b;
+        opacity: 0.7;
+      }
+      .terminal .line { white-space: nowrap; }
+      .terminal .dim { color: #a89880; opacity: 0.7; }
+      .agent-pill {
+        position: absolute;
+        left: 160px;
+        top: 88px;
+        padding: 12px 22px;
+        border-radius: 999px;
+        background: rgba(111, 143, 104, 0.2);
+        border: 1px solid rgba(111, 143, 104, 0.55);
+        color: #9fbf96;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .merit-stack {
+        position: absolute;
+        right: 40px;
+        top: 28px;
+        width: 620px;
+        text-align: center;
+        z-index: 6;
+        pointer-events: none;
+      }
+      .merit-label {
+        font-size: 38px;
+        color: #d4a84b;
+        margin-bottom: 0;
+        font-weight: 700;
+        letter-spacing: 0.32em;
+        text-indent: 0.32em;
+        text-shadow: 0 0 28px rgba(212, 168, 75, 0.55);
+      }
+      .merit-num-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 250px;
+        transform-origin: center center;
+      }
+      .merit-num-ghost {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 260px;
+        font-weight: 900;
+        letter-spacing: -0.06em;
+        font-variant-numeric: tabular-nums;
+        color: rgba(212, 168, 75, 0.12);
+        filter: blur(3px);
+        transform: scale(1.22);
+        pointer-events: none;
+      }
+      .merit-num {
+        position: relative;
+        font-size: 200px;
+        font-weight: 900;
+        line-height: 0.92;
+        letter-spacing: -0.06em;
+        font-variant-numeric: tabular-nums;
+        color: #ffe29a;
+        background: linear-gradient(180deg, #fff8dc 0%, #ffd56a 40%, #d4a84b 70%, #c45c26 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter:
+          drop-shadow(0 10px 0 rgba(70, 36, 8, 0.55))
+          drop-shadow(0 0 18px rgba(255, 220, 120, 0.85))
+          drop-shadow(0 0 56px rgba(255, 170, 60, 0.55));
+        transform-origin: center center;
+      }
+      .merit-tick {
+        margin-top: -6px;
+        font-size: 42px;
+        font-weight: 900;
+        color: #ff8a3d;
+        letter-spacing: 0.06em;
+        text-shadow: 0 0 18px rgba(255, 120, 40, 0.7);
+        opacity: 0;
+      }
+      .merit-bloom {
+        position: absolute;
+        left: 50%;
+        top: 34%;
+        width: 900px;
+        height: 900px;
+        transform: translate(-50%, -50%) scale(0.4);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 220, 120, 0.55) 0%, rgba(196, 92, 38, 0.18) 38%, transparent 68%);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .merit-plus-wrap {
+        position: absolute;
+        left: 50%;
+        top: 34%;
+        transform: translate(-50%, -50%);
+        z-index: 4;
+        text-align: center;
+      }
+      .merit-plus {
+        font-size: 300px;
+        font-weight: 900;
+        line-height: 0.88;
+        letter-spacing: -0.06em;
+        font-variant-numeric: tabular-nums;
+        color: #ffe29a;
+        background: linear-gradient(180deg, #fffaf0 0%, #ffe08a 35%, #ffb040 65%, #c45c26 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter:
+          drop-shadow(0 14px 0 rgba(70, 36, 8, 0.5))
+          drop-shadow(0 0 28px rgba(255, 200, 90, 0.9))
+          drop-shadow(0 0 70px rgba(255, 140, 40, 0.55));
+        transform-origin: center center;
+      }
+      .merit-plus-sub {
+        margin-top: 4px;
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: 0.28em;
+        color: #ffd56a;
+        text-shadow: 0 0 24px rgba(255, 190, 80, 0.65);
+        opacity: 0;
+      }
+      .pet-daily {
+        top: 62%;
+        width: 360px;
+        height: 360px;
+        opacity: 0.82;
+      }
+      .stage-label {
+        position: absolute;
+        left: 50%;
+        top: 108px;
+        transform: translateX(-50%);
+        font-size: 34px;
+        font-weight: 700;
+        color: #a89880;
+        letter-spacing: 0.12em;
+      }
+      .clouds {
+        position: absolute;
+        left: 50%;
+        top: 40%;
+        width: 1280px;
+        height: 600px;
+        transform: translate(-50%, -50%);
+        object-fit: contain;
+        opacity: 0.62;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+      .clouds-finale {
+        width: 1500px;
+        height: 700px;
+        opacity: 0.72;
+      }
+      .cta-lockup {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        width: 1700px;
+        text-align: center;
+        z-index: 6;
+      }
+      .cta-brand {
+        font-family: "Montserrat", "Noto Sans SC", sans-serif;
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #d4a84b;
+        margin-bottom: 14px;
+      }
+      .cta-title {
+        font-size: 64px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.25;
+        color: #f0e4cc;
+        text-shadow: 0 4px 28px rgba(0, 0, 0, 0.55);
+      }
+      .halo-ring {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        width: 820px;
+        height: 820px;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        border: 2px solid rgba(255, 214, 120, 0.22);
+        box-shadow: 0 0 80px rgba(255, 214, 120, 0.18), inset 0 0 60px rgba(255, 214, 120, 0.08);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-root" id="root" data-composition-id="main" data-start="0" data-duration="25.5" data-width="1920" data-height="1080">
+      <!-- Track 0: atmosphere -->
+      <div data-hf-id="hf-atm" id="scene-atm" class="clip" data-start="0" data-duration="25.5" data-track-index="0">
+        <div data-hf-id="hf-fill" class="scene-fill"></div>
+        <div data-hf-id="hf-ga" id="glow-a" class="glow glow-a" data-layout-allow-overflow="true"></div>
+        <div data-hf-id="hf-gb" id="glow-b" class="glow glow-b" data-layout-allow-overflow="true"></div>
+        <div data-hf-id="hf-grain" class="grain"></div>
+        <div data-hf-id="hf-desk" class="desk-line"></div>
+      </div>
+
+      <!-- Track 1: contiguous scenes (no micro-clips, no overlaps) -->
+      <div data-hf-id="hf-hook" id="scene-hook" class="clip" data-start="0" data-duration="2.50" data-track-index="1">
+        <div data-hf-id="hf-ddl" class="ghost-deadline" id="ghost-ddl">DEADLINE · 23:59</div>
+        <div data-hf-id="hf-err" class="ghost-err" id="ghost-err">Error: permission denied<br data-hf-id="hf-br1">retry? (y/n)_</div>
+        <img data-hf-id="hf-ph" id="pet-hook" class="pet pet-center" src="assets/stages/mortal-idle.png" alt="凡人">
+        <div data-hf-id="hf-ch" id="cap-hook" class="caption">又想临时抱佛脚？</div>
+      </div>
+
+      <div data-hf-id="hf-flip" id="scene-flip" class="clip" data-start="2.5" data-duration="2.70" data-track-index="1">
+        <div data-hf-id="hf-pill" class="agent-pill" id="agent-pill">agent · working</div>
+        <div data-hf-id="hf-knock-flip-stack" class="knock-stack">
+          <img data-hf-id="hf-knock-flip-f1" id="knock-flip-f1" class="pet pet-center knock-frame" src="assets/knock/mortal-working-1.png" alt="">
+          <img data-hf-id="hf-knock-flip-f2" id="knock-flip-f2" class="pet pet-center knock-frame" src="assets/knock/mortal-working-2.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-flip-f3" id="knock-flip-f3" class="pet pet-center knock-frame" src="assets/knock/mortal-working-3.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-flip-f4" id="knock-flip-f4" class="pet pet-center knock-frame" src="assets/knock/mortal-working-4.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-flip-f5" id="knock-flip-f5" class="pet pet-center knock-frame" src="assets/knock/mortal-working-5.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-flip-f6" id="knock-flip-f6" class="pet pet-center knock-frame" src="assets/knock/mortal-working-6.png" alt="" style="opacity:0">
+        </div>
+        <div data-hf-id="hf-cf" id="cap-flip" class="caption">不用。它每天都在拜。</div>
+      </div>
+
+      <div data-hf-id="hf-sync" id="scene-sync" class="clip" data-start="5.2" data-duration="4.00" data-track-index="1">
+        <div data-hf-id="hf-term" class="terminal" id="terminal">
+          <div data-hf-id="hf-bar" class="bar"><span data-hf-id="hf-d1" class="dot"></span><span data-hf-id="hf-d2" class="dot"></span><span data-hf-id="hf-d3" class="dot"></span></div>
+          <div data-hf-id="hf-l1" class="line dim">$ cursor agent run</div>
+          <div data-hf-id="hf-l2" class="line">thinking… drafting patch</div>
+          <div data-hf-id="hf-l3" class="line">edit src/main.js</div>
+          <div data-hf-id="hf-l4" class="line">run tests ▸ 42 passed</div>
+          <div data-hf-id="hf-l5" class="line dim">awaiting next tool…</div>
+        </div>
+        <div data-hf-id="hf-knock-sync-stack" class="knock-stack">
+          <img data-hf-id="hf-knock-sync-f1" id="knock-sync-f1" class="pet pet-right knock-frame" src="assets/knock/mortal-working-1.png" alt="">
+          <img data-hf-id="hf-knock-sync-f2" id="knock-sync-f2" class="pet pet-right knock-frame" src="assets/knock/mortal-working-2.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-sync-f3" id="knock-sync-f3" class="pet pet-right knock-frame" src="assets/knock/mortal-working-3.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-sync-f4" id="knock-sync-f4" class="pet pet-right knock-frame" src="assets/knock/mortal-working-4.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-sync-f5" id="knock-sync-f5" class="pet pet-right knock-frame" src="assets/knock/mortal-working-5.png" alt="" style="opacity:0">
+          <img data-hf-id="hf-knock-sync-f6" id="knock-sync-f6" class="pet pet-right knock-frame" src="assets/knock/mortal-working-6.png" alt="" style="opacity:0">
+        </div>
+        <div data-hf-id="hf-ms" class="merit-stack" id="merit-stack" data-layout-allow-overlap="true" data-layout-allow-occlusion="true">
+          <div data-hf-id="hf-ml" class="merit-label">功德</div>
+          <div data-hf-id="hf-mnw" class="merit-num-wrap" id="merit-num-wrap">
+            <div data-hf-id="hf-mng" class="merit-num-ghost" id="merit-ghost" data-layout-ignore="true">128</div>
+            <div data-hf-id="hf-mn" class="merit-num" id="merit-num">128</div>
+          </div>
+          <div data-hf-id="hf-mt" class="merit-tick" id="merit-tick">+1</div>
+        </div>
+        <div data-hf-id="hf-cs" id="cap-sync" class="caption caption-sm">Agent 敲代码，它敲木鱼。</div>
+      </div>
+
+      <div data-hf-id="hf-daily" id="scene-daily" class="clip" data-start="9.2" data-duration="2.20" data-track-index="1">
+        <div data-hf-id="hf-bloom" id="merit-bloom" class="merit-bloom" data-layout-allow-overflow="true"></div>
+        <img data-hf-id="hf-pd" id="pet-daily" class="pet pet-center pet-daily" src="assets/stages/mortal-idle.png" alt="完成态">
+        <div data-hf-id="hf-mpw" class="merit-plus-wrap" id="merit-plus-wrap">
+          <div data-hf-id="hf-mp" id="merit-plus" class="merit-plus">+50</div>
+          <div data-hf-id="hf-mps" id="merit-plus-sub" class="merit-plus-sub">日课功德</div>
+        </div>
+        <div data-hf-id="hf-cd" id="cap-daily" class="caption">日课，不是补考。</div>
+      </div>
+
+      <div data-hf-id="hf-stages" id="scene-stages" class="clip" data-start="11.4" data-duration="4.80" data-track-index="1">
+        <div data-hf-id="hf-stage-layer-mortal" id="stage-layer-mortal" class="stage-layer">
+          <div data-hf-id="hf-sl-mortal" class="stage-label">凡人</div>
+          <img data-hf-id="hf-si-mortal" id="img-stage-mortal" class="pet pet-stage" src="assets/stages/mortal-idle.png" alt="凡人">
+        </div>
+        <div data-hf-id="hf-stage-layer-adept" id="stage-layer-adept" class="stage-layer" style="opacity:0">
+          <div data-hf-id="hf-sl-adept" class="stage-label">修行者</div>
+          <img data-hf-id="hf-si-adept" id="img-stage-adept" class="pet pet-stage" src="assets/stages/adept-idle.png" alt="修行者">
+        </div>
+        <div data-hf-id="hf-stage-layer-novice" id="stage-layer-novice" class="stage-layer" style="opacity:0">
+          <div data-hf-id="hf-sl-novice" class="stage-label">小和尚</div>
+          <img data-hf-id="hf-si-novice" id="img-stage-novice" class="pet pet-stage" src="assets/stages/novice-idle.png" alt="小和尚">
+        </div>
+        <div data-hf-id="hf-stage-layer-arhat" id="stage-layer-arhat" class="stage-layer" style="opacity:0">
+          <div data-hf-id="hf-sl-arhat" class="stage-label">罗汉</div>
+          <img data-hf-id="hf-si-arhat" id="img-stage-arhat" class="pet pet-stage" src="assets/stages/arhat-idle.png" alt="罗汉">
+        </div>
+        <div data-hf-id="hf-stage-layer-bodhi" id="stage-layer-bodhi" class="stage-layer" style="opacity:0">
+          <div data-hf-id="hf-sl-bodhi" class="stage-label">菩萨</div>
+          <img data-hf-id="hf-si-bodhi" id="img-stage-bodhi" class="pet pet-stage" src="assets/stages/bodhisattva-idle.png" alt="菩萨">
+        </div>
+        <div data-hf-id="hf-stage-layer-buddha" id="stage-layer-buddha" class="stage-layer" style="opacity:0">
+          <div data-hf-id="hf-sl-buddha" class="stage-label">佛祖</div>
+          <img data-hf-id="hf-si-buddha" id="img-stage-buddha" class="pet pet-stage" src="assets/stages/buddha-idle.png" alt="佛祖">
+        </div>
+        <div data-hf-id="hf-cst" id="cap-stages" class="caption caption-sm">功课见长，越拜越精神。</div>
+      </div>
+
+      <div data-hf-id="hf-chk" id="scene-checkin" class="clip" data-start="16.2" data-duration="2.20" data-track-index="1">
+        <img data-hf-id="hf-cl" id="clouds" class="clouds" src="assets/cloud-scrolls.png" alt="">
+        <img data-hf-id="hf-pc" id="pet-checkin" class="pet pet-center" src="assets/stages/adept-idle.png" alt="功课打卡">
+        <div data-hf-id="hf-cc" id="cap-checkin" class="caption">今日功课，打卡。</div>
+      </div>
+
+      <div data-hf-id="hf-cta" id="scene-cta" class="clip" data-start="18.4" data-duration="7.10" data-track-index="1">
+        <div data-hf-id="hf-gf" id="glow-finale" class="glow glow-finale" data-layout-allow-overflow="true"></div>
+        <img data-hf-id="hf-clf" id="clouds-finale" class="clouds clouds-finale" src="assets/cloud-scrolls.png" alt="">
+        <div data-hf-id="hf-halo" id="halo-ring" class="halo-ring"></div>
+        <img data-hf-id="hf-buddha" id="pet-finale" class="pet pet-finale" src="assets/stages/buddha-idle.png" alt="佛祖">
+        <div data-hf-id="hf-lock" class="cta-lockup">
+          <div data-hf-id="hf-brand" id="cta-brand" class="cta-brand">Clawd · Cultivator</div>
+          <div data-hf-id="hf-title" id="cta-title" class="cta-title">开源桌宠 · 日日礼佛，不抱佛脚</div>
+        </div>
+      </div>
+
+      <!-- Track 5: knock SFX only -->
+      <audio data-hf-id="hf-a-sfx-flip-00" id="sfx-flip-00" class="clip" data-start="2.85" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-flip-01" id="sfx-flip-01" class="clip" data-start="3.45" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-flip-02" id="sfx-flip-02" class="clip" data-start="4.05" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-flip-03" id="sfx-flip-03" class="clip" data-start="4.65" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-00" id="sfx-sync-00" class="clip" data-start="5.55" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-01" id="sfx-sync-01" class="clip" data-start="6.15" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-02" id="sfx-sync-02" class="clip" data-start="6.75" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-03" id="sfx-sync-03" class="clip" data-start="7.35" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-04" id="sfx-sync-04" class="clip" data-start="7.95" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-sync-05" id="sfx-sync-05" class="clip" data-start="8.55" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-00" id="sfx-stage-00" class="clip" data-start="11.45" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-01" id="sfx-stage-01" class="clip" data-start="12.25" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-02" id="sfx-stage-02" class="clip" data-start="13.05" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-03" id="sfx-stage-03" class="clip" data-start="13.85" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-04" id="sfx-stage-04" class="clip" data-start="14.65" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-a-sfx-stage-05" id="sfx-stage-05" class="clip" data-start="15.45" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.85"></audio>
+      <audio data-hf-id="hf-sfx-daily" id="sfx-daily" class="clip" data-start="10.00" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="0.75"></audio>
+      <audio data-hf-id="hf-sfx-cta" id="sfx-cta" class="clip" data-start="18.70" data-duration="0.55" data-track-index="5" src="assets/knock.wav" data-volume="1"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const FRAME = 0.1;
+      const N_FRAMES = 6;
+      const STAGE_IDS = ["mortal","adept","novice","arhat","bodhi","buddha"];
+      const STAGE_DUR = 0.7999999999999998;
+      const T_FLIP = 2.5;
+      const T_SYNC = 5.2;
+      const T_STAGES = 11.4;
+
+      function scheduleKnock(prefix, start, end) {
+        const ids = [];
+        for (let i = 1; i <= N_FRAMES; i++) ids.push("#" + prefix + "-f" + i);
+        let t = start;
+        let i = 0;
+        while (t < end - 0.001) {
+          const frame = i % N_FRAMES;
+          // Seek-safe discrete swaps (no tl.call)
+          ids.forEach((sel, idx) => {
+            tl.set(sel, { opacity: idx === frame ? 1 : 0 }, t);
+          });
+          t += FRAME;
+          i += 1;
+        }
+      }
+
+      function scheduleStages() {
+        STAGE_IDS.forEach((id, i) => {
+          const t = T_STAGES + i * STAGE_DUR;
+          STAGE_IDS.forEach((other) => {
+            tl.set("#stage-layer-" + other, { opacity: other === id ? 1 : 0 }, t);
+          });
+          if (i > 0) {
+            tl.from("#img-stage-" + id, { scale: 0.9, duration: 0.22, ease: "power2.out" }, t);
+          }
+        });
+      }
+
+      tl.to("#glow-a", { scale: 1.08, duration: 2.4, ease: "sine.inOut", yoyo: true, repeat: 9 }, 0);
+      tl.to("#glow-b", { scale: 1.06, duration: 2.8, ease: "sine.inOut", yoyo: true, repeat: 8 }, 0.3);
+
+      // Hook
+      tl.from("#cap-hook", { opacity: 0, y: 28, duration: 0.35, ease: "power3.out" }, 0.25);
+      tl.from("#pet-hook", { opacity: 0, y: 20, duration: 0.4, ease: "power3.out" }, 0.1);
+      tl.from("#ghost-ddl", { opacity: 0, duration: 0.4 }, 0.55);
+      tl.from("#ghost-err", { opacity: 0, duration: 0.4 }, 0.75);
+
+      // Flip + knock
+      tl.from("#cap-flip", { opacity: 0, y: 28, duration: 0.32, ease: "power3.out" }, 2.6);
+      tl.from("#agent-pill", { opacity: 0, x: -16, duration: 0.28 }, 2.65);
+      scheduleKnock("knock-flip", 2.5, 5.2);
+
+      // Sync + knock + hero merit count
+      tl.from("#terminal", { opacity: 0, x: -32, duration: 0.35, ease: "power3.out" }, 5.25);
+      tl.from("#merit-stack", { opacity: 0, y: -20, duration: 0.35, ease: "power3.out" }, 5.35);
+      tl.from("#cap-sync", { opacity: 0, y: 22, duration: 0.32, ease: "power3.out" }, 5.35);
+      scheduleKnock("knock-sync", 5.2, 9.2);
+
+      const merit = { v: 128 };
+      const paintMerit = () => {
+        const n = String(Math.round(merit.v));
+        const el = document.getElementById("merit-num");
+        const ghost = document.getElementById("merit-ghost");
+        if (el) el.textContent = n;
+        if (ghost) ghost.textContent = n;
+      };
+      // Count-up with growing visual weight (counting-dynamic-scale)
+      tl.fromTo("#merit-num-wrap", { scale: 0.48 }, { scale: 1, duration: 3.4, ease: "power2.out" }, 5.45);
+      tl.fromTo("#merit-ghost", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out" }, 5.5);
+      tl.to(merit, {
+        v: 186,
+        duration: 3.4,
+        ease: "power1.out",
+        onUpdate: paintMerit,
+      }, 5.45);
+      // Knock-synced punch ticks on the numeral (wrap holds the growth)
+      [5.55, 6.15, 6.75, 7.35, 7.95, 8.55].forEach((t) => {
+        tl.fromTo(
+          "#merit-num",
+          { scale: 1 },
+          { scale: 1.18, duration: 0.08, yoyo: true, repeat: 1, ease: "power2.out" },
+          t
+        );
+        tl.fromTo(
+          "#merit-tick",
+          { opacity: 0, y: 12, scale: 0.7 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.12, ease: "back.out(2)" },
+          t
+        );
+        tl.to("#merit-tick", { opacity: 0, y: -18, duration: 0.28, ease: "power2.in" }, t + 0.22);
+      });
+
+      // Daily — +50 slam
+      tl.from("#pet-daily", { opacity: 0, scale: 0.92, duration: 0.32, ease: "power3.out" }, 9.25);
+      tl.fromTo(
+        "#merit-bloom",
+        { opacity: 0, scale: 0.35 },
+        { opacity: 1, scale: 1.15, duration: 0.45, ease: "power2.out" },
+        9.35
+      );
+      tl.to("#merit-bloom", { opacity: 0.35, duration: 0.8, ease: "power1.out" }, 9.85);
+      tl.fromTo(
+        "#merit-plus",
+        { opacity: 0, scale: 0.25, rotate: -8 },
+        { opacity: 1, scale: 1, rotate: 0, duration: 0.55, ease: "back.out(1.8)" },
+        9.38
+      );
+      tl.fromTo(
+        "#merit-plus",
+        { scale: 1 },
+        { scale: 1.08, duration: 0.18, yoyo: true, repeat: 1, ease: "power2.out" },
+        9.95
+      );
+      tl.fromTo(
+        "#merit-plus-sub",
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" },
+        9.7
+      );
+      tl.from("#cap-daily", { opacity: 0, y: 24, duration: 0.32, ease: "power3.out" }, 9.55);
+      tl.to("#merit-plus-wrap", { opacity: 0, y: -36, scale: 1.08, duration: 0.4, ease: "power2.in" }, 10.85);
+      tl.to("#merit-bloom", { opacity: 0, duration: 0.35 }, 10.85);
+
+      // Stages (single clip, opacity swaps)
+      tl.from("#cap-stages", { opacity: 0, y: 18, duration: 0.28, ease: "power3.out" }, 11.5);
+      scheduleStages();
+
+      // Check-in
+      tl.from("#clouds", { opacity: 0, scale: 1.08, duration: 0.55, ease: "power2.out" }, 16.25);
+      tl.from("#pet-checkin", { opacity: 0, scale: 0.88, duration: 0.38, ease: "power3.out" }, 16.35);
+      tl.from("#cap-checkin", { opacity: 0, y: 24, duration: 0.3, ease: "power3.out" }, 16.5);
+      tl.to("#clouds", { x: 28, duration: 2, ease: "none" }, 16.3);
+
+      // Buddha finale
+      tl.from("#glow-finale", { opacity: 0, scale: 0.85, duration: 0.7, ease: "power2.out" }, 18.45);
+      tl.from("#clouds-finale", { opacity: 0, scale: 1.12, duration: 0.75, ease: "power2.out" }, 18.5);
+      tl.from("#halo-ring", { opacity: 0, scale: 0.8, duration: 0.65, ease: "power2.out" }, 18.55);
+      tl.from("#pet-finale", { opacity: 0, scale: 0.82, y: 24, duration: 0.7, ease: "power3.out" }, 18.6);
+      tl.from("#cta-brand", { opacity: 0, y: 12, duration: 0.32 }, 19.1);
+      tl.from("#cta-title", { opacity: 0, y: 20, duration: 0.4, ease: "power3.out" }, 19.25);
+      tl.to("#halo-ring", { scale: 1.06, duration: 2.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 19.3);
+      tl.to("#clouds-finale", { x: 36, duration: 5, ease: "none" }, 18.6);
+      tl.to("#pet-finale", { y: "-=10", duration: 2.4, ease: "sine.inOut", yoyo: true, repeat: 1 }, 19.4);
+      tl.set({}, {}, 25.5);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

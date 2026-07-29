@@ -365,16 +365,20 @@ const SCHEMA = {
     defaultFactory: () => ({}),
     normalize: normalizeThemeVariant,
   },
-  // #509: per-theme default idle visual (e.g. {clawd: "clawd-idle-reading.svg"}).
-  // Missing key for a theme = that theme's stock idle behavior. Values are bare
-  // filenames validated against the LOADED theme at resolve time
-  // (idle-visual.js), never here, so a theme update that drops the file
-  // degrades gracefully to the theme default.
   idleVisual: {
     type: "object",
     defaultFactory: () => ({}),
     normalize: normalizeIdleVisual,
   },
+  // Merit cultivator progress, bucketed by theme id. Stage is derived from
+  // merit at runtime — never persist stageIndex / variant as progression truth.
+  meritProgress: {
+    type: "object",
+    defaultFactory: () => ({}),
+    normalize: normalizeMeritProgress,
+  },
+  // When false, hide the pet-window merit overlay but keep scoring.
+  meritOverlayEnabled: { type: "boolean", default: true },
   sessionAliases: {
     type: "object",
     defaultFactory: () => ({}),
@@ -1127,6 +1131,49 @@ function normalizeIdleVisual(value, defaultsValue) {
     // Bare filenames only — asset paths are resolved by the theme loader.
     if (file.includes("/") || file.includes("\\")) continue;
     out[themeId] = file;
+  }
+  return out;
+}
+
+function normalizeMeritProgressBucket(value) {
+  const src = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const merit = Number(src.merit);
+  const dailyEarned = Number(src.dailyEarned);
+  const streakDays = Number(src.streakDays);
+  return {
+    merit: Number.isFinite(merit) && merit > 0
+      ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(merit))
+      : 0,
+    dayKey: typeof src.dayKey === "string" && src.dayKey ? src.dayKey : null,
+    dailyEarned: Number.isFinite(dailyEarned) && dailyEarned > 0
+      ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(dailyEarned))
+      : 0,
+    lastActiveDayKey: typeof src.lastActiveDayKey === "string" && src.lastActiveDayKey
+      ? src.lastActiveDayKey
+      : null,
+    streakDays: Number.isFinite(streakDays) && streakDays > 0
+      ? Math.min(3650, Math.floor(streakDays))
+      : 0,
+    introSeen: src.introSeen === true,
+    peakStageId: typeof src.peakStageId === "string" && src.peakStageId.trim()
+      ? src.peakStageId.trim()
+      : null,
+    debugStageId: typeof src.debugStageId === "string" && src.debugStageId.trim()
+      ? src.debugStageId.trim()
+      : null,
+  };
+}
+
+function normalizeMeritProgress(value, defaultsValue) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return defaultsValue || {};
+  }
+  const out = {};
+  for (const themeId of Object.keys(value)) {
+    if (typeof themeId !== "string" || !themeId) continue;
+    const bucket = value[themeId];
+    if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) continue;
+    out[themeId] = normalizeMeritProgressBucket(bucket);
   }
   return out;
 }

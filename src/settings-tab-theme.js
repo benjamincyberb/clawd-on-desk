@@ -11,6 +11,7 @@
   let customizingThemeId = null;
   let customizationSelectionPendingThemeId = null;
   let customizationSelectionSeq = 0;
+  let renderHooksRef = null;
 
   function t(key) {
     return helpers.t(key);
@@ -77,6 +78,16 @@
       }
       sectionEl.appendChild(grid);
       parent.appendChild(sectionEl);
+    }
+
+    const active = (runtime.themeList || []).find((theme) => theme && theme.active);
+    if (
+      active
+      && active.capabilities
+      && active.capabilities.meritCultivator
+      && active.capabilities.meritCultivator.enabled
+    ) {
+      parent.appendChild(buildMeritCultivatorPanel(active));
     }
   }
 
@@ -174,6 +185,9 @@
     if (caps.sleepMode === "direct") badges.push(t("themeCapabilityDirectSleep"));
     if (caps.powerProfile === "scripted") badges.push(t("themeCapabilityFineMotion"));
     if (caps.reactions === false) badges.push(t("themeCapabilityNoReactions"));
+    if (caps.meritCultivator && caps.meritCultivator.enabled) {
+      badges.push(t("themeCapabilityMerit"));
+    }
     return badges;
   }
 
@@ -497,6 +511,257 @@
     return row;
   }
 
+  function localizeStageName(name) {
+    if (typeof name === "string") return name;
+    if (!name || typeof name !== "object") return "";
+    const lang = (readers && typeof readers.getLang === "function")
+      ? readers.getLang()
+      : "en";
+    if (typeof name[lang] === "string") return name[lang];
+    if (typeof name.en === "string") return name.en;
+    if (typeof name.zh === "string") return name.zh;
+    const first = Object.values(name).find((value) => typeof value === "string");
+    return first || "";
+  }
+
+  function buildMeritCultivatorPanel(theme) {
+    const panel = document.createElement("section");
+    panel.className = "merit-panel";
+    panel.setAttribute("aria-labelledby", "merit-panel-title");
+
+    const title = document.createElement("h2");
+    title.id = "merit-panel-title";
+    title.className = "theme-section-title";
+    title.textContent = t("meritPanelTitle");
+    panel.appendChild(title);
+
+    const disclaimer = document.createElement("p");
+    disclaimer.className = "merit-disclaimer";
+    disclaimer.textContent = t("meritCulturalDisclaimer");
+    panel.appendChild(disclaimer);
+
+    const statusBox = document.createElement("div");
+    statusBox.className = "merit-status-box";
+    statusBox.textContent = t("meritStatusLoading");
+    panel.appendChild(statusBox);
+
+    const overlayRow = document.createElement("label");
+    overlayRow.className = "merit-toggle-row";
+    const overlayInput = document.createElement("input");
+    overlayInput.type = "checkbox";
+    overlayInput.checked = state.snapshot
+      ? state.snapshot.meritOverlayEnabled !== false
+      : true;
+    const overlayText = document.createElement("span");
+    overlayText.textContent = t("meritOverlayToggle");
+    overlayRow.appendChild(overlayInput);
+    overlayRow.appendChild(overlayText);
+    overlayInput.addEventListener("change", () => {
+      if (!window.settingsAPI || typeof window.settingsAPI.update !== "function") return;
+      const next = !!overlayInput.checked;
+      window.settingsAPI.update("meritOverlayEnabled", next).then((result) => {
+        if (!result || result.status !== "ok") {
+          overlayInput.checked = !next;
+          ops.showToast(t("toastSaveFailed") + ((result && result.message) || ""), { error: true });
+        }
+      }).catch((err) => {
+        overlayInput.checked = !next;
+        ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+      });
+    });
+    panel.appendChild(overlayRow);
+
+    const meritStages = theme.capabilities.meritCultivator.stages || [];
+    if (meritStages.length > 0) {
+      panel.appendChild(buildMeritDebugStageRow(theme, meritStages));
+      panel.appendChild(buildMeritKnockButton(theme, meritStages));
+    }
+
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.className = "soft-btn settings-confirm-danger";
+    resetBtn.textContent = t("meritResetButton");
+    resetBtn.addEventListener("click", () => handleResetMeritProgress(theme));
+    panel.appendChild(resetBtn);
+
+    if (window.settingsAPI && typeof window.settingsAPI.getMeritStatus === "function") {
+      window.settingsAPI.getMeritStatus().then((status) => {
+        if (!status || !status.enabled) {
+          statusBox.textContent = t("meritStatusInactive");
+          return;
+        }
+        const stageName = status.stageNameText || localizeStageName(status.stageName) || status.stageId || "";
+        const next = Number.isFinite(status.nextRequiredMerit)
+          ? Math.max(0, status.nextRequiredMerit - (status.merit || 0))
+          : null;
+        const lines = [
+          `${t("meritStatusStage")}: ${stageName}`,
+          `${t("meritStatusTotal")}: ${Math.floor(status.merit || 0)}`,
+          next == null ? t("meritStatusMaxStage") : `${t("meritStatusToNext")}: ${next}`,
+          `${t("meritStatusStreak")}: ${Math.floor(status.streakDays || 0)}`,
+        ];
+        statusBox.textContent = lines.join("\n");
+      }).catch(() => {
+        statusBox.textContent = t("meritStatusInactive");
+      });
+    }
+
+    return panel;
+  }
+
+  function buildMeritDebugStageRow(theme, stages) {
+    const row = document.createElement("div");
+    row.className = "merit-debug-row";
+
+    const label = document.createElement("label");
+    label.className = "merit-debug-label";
+    label.textContent = t("meritDebugStageLabel");
+    row.appendChild(label);
+
+    const hint = document.createElement("p");
+    hint.className = "merit-debug-hint";
+    hint.textContent = t("meritDebugStageHint");
+    row.appendChild(hint);
+
+    const select = document.createElement("select");
+    select.className = "merit-debug-select";
+
+    const autoOpt = document.createElement("option");
+    autoOpt.value = "auto";
+    autoOpt.textContent = t("meritDebugStageAuto");
+    select.appendChild(autoOpt);
+
+    for (const stage of stages) {
+      const opt = document.createElement("option");
+      opt.value = stage.id;
+      opt.textContent = localizeStageName(stage.name) || stage.id;
+      select.appendChild(opt);
+    }
+
+    const bucket = state.snapshot && state.snapshot.meritProgress
+      ? state.snapshot.meritProgress[theme.id]
+      : null;
+    const currentDebug = bucket && bucket.debugStageId;
+    select.value = currentDebug || "auto";
+
+    select.addEventListener("change", () => {
+      if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") return;
+      const stageId = select.value;
+      const prevValue = currentDebug || "auto";
+      select.disabled = true;
+      window.settingsAPI.command("previewMeritStage", {
+        themeId: theme.id,
+        stageId,
+      }).then((result) => {
+        select.disabled = false;
+        if (!result || result.status !== "ok") {
+          select.value = prevValue;
+          ops.showToast(t("toastSaveFailed") + ((result && result.message) || ""), { error: true });
+          return;
+        }
+        ops.showToast(t("meritDebugStageApplied"));
+        if (state.activeTab === "theme") ops.requestRender({ content: true });
+      }).catch((err) => {
+        select.disabled = false;
+        select.value = prevValue;
+        ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+      });
+    });
+
+    row.appendChild(select);
+    return row;
+  }
+
+  function resolveMeritDebugStageId(theme, stages) {
+    const bucket = state.snapshot && state.snapshot.meritProgress
+      ? state.snapshot.meritProgress[theme.id]
+      : null;
+    if (bucket && typeof bucket.debugStageId === "string" && bucket.debugStageId) {
+      if (stages.some((entry) => entry.id === bucket.debugStageId)) {
+        return bucket.debugStageId;
+      }
+    }
+    return null;
+  }
+
+  function buildMeritKnockButton(theme, stages) {
+    const wrap = document.createElement("div");
+    wrap.className = "merit-debug-row";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "soft-btn";
+    btn.textContent = t("meritKnockButton");
+    btn.addEventListener("click", () => {
+      if (!window.settingsAPI || typeof window.settingsAPI.previewAnimationOverride !== "function") {
+        ops.showToast(t("toastSaveFailed") + "preview unavailable", { error: true });
+        return;
+      }
+      const debugStageId = resolveMeritDebugStageId(theme, stages);
+      const fetchStage = window.settingsAPI.getMeritStatus
+        ? window.settingsAPI.getMeritStatus()
+        : Promise.resolve(null);
+      btn.disabled = true;
+      fetchStage.then((status) => {
+        const stageId = debugStageId
+          || (status && status.stageId)
+          || (stages[0] && stages[0].id)
+          || "mortal";
+        const file = `${stageId}-working.svg`;
+        return window.settingsAPI.previewAnimationOverride({
+          stateKey: "working",
+          file,
+          durationMs: 4000,
+        }).then((result) => {
+          if (!result || result.status !== "ok") {
+            ops.showToast(t("toastSaveFailed") + ((result && result.message) || ""), { error: true });
+            return;
+          }
+          ops.showToast(t("meritKnockApplied"));
+        });
+      }).catch((err) => {
+        ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+      }).finally(() => {
+        btn.disabled = false;
+      });
+    });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function handleResetMeritProgress(theme) {
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") return;
+    const run = () => {
+      window.settingsAPI.command("resetMeritProgress", { confirmed: true, themeId: theme && theme.id })
+        .then((result) => {
+          if (!result || result.status !== "ok") {
+            ops.showToast(t("toastSaveFailed") + ((result && result.message) || ""), { error: true });
+            return;
+          }
+          ops.showToast(t("meritResetDone"));
+          if (state.activeTab === "theme") ops.requestRender({ content: true });
+        })
+        .catch((err) => {
+          ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+        });
+    };
+
+    if (typeof ops.showSettingsConfirmModal === "function") {
+      ops.showSettingsConfirmModal({
+        title: t("meritResetConfirmTitle"),
+        detail: t("meritResetConfirmDetail"),
+        actions: [
+          { id: "cancel", label: t("meritResetCancel") },
+          { id: "confirm", label: t("meritResetConfirm"), tone: "danger" },
+        ],
+      }).then((actionId) => {
+        if (actionId === "confirm") run();
+      });
+      return;
+    }
+    if (window.confirm(t("meritResetConfirmDetail"))) run();
+  }
+
   function buildThemeActions() {
     const row = document.createElement("div");
     row.className = "theme-actions";
@@ -523,6 +788,19 @@
     if (runtime.codexPetsRefreshPending) refreshBtn.classList.add("pending");
     refreshBtn.addEventListener("click", handleRefreshCodexPets);
     codexGroup.buttons.appendChild(refreshBtn);
+
+    const adoptPetdexBtn = document.createElement("button");
+    adoptPetdexBtn.type = "button";
+    adoptPetdexBtn.className = "soft-btn";
+    adoptPetdexBtn.textContent = t("themeAdoptPetdex");
+    adoptPetdexBtn.title = t("themeAdoptPetdexHint");
+    adoptPetdexBtn.disabled = !!runtime.petdexAdoptPending
+      || !window.settingsAPI
+      || typeof window.settingsAPI.adoptPetdexPet !== "function"
+      || typeof window.settingsAPI.browsePetdexPets !== "function";
+    if (runtime.petdexAdoptPending) adoptPetdexBtn.classList.add("pending");
+    adoptPetdexBtn.addEventListener("click", handleAdoptPetdexPet);
+    codexGroup.buttons.appendChild(adoptPetdexBtn);
     row.appendChild(codexGroup.group);
 
     const userThemeGroup = buildThemeActionGroup(t("themeActionGroupUserThemes"));
@@ -842,6 +1120,293 @@
       });
   }
 
+  function formatPetdexBrowseFailed(message) {
+    const formatter = t("themePetdexBrowseFailed");
+    return typeof formatter === "function" ? formatter(message || "") : `Couldn't load Petdex catalog: ${message || ""}`;
+  }
+
+  function restorePetdexModalHook() {
+    if (!renderHooksRef) return;
+    if (runtime.petdexModalPrevModalHook) {
+      renderHooksRef.modal = runtime.petdexModalPrevModalHook;
+      runtime.petdexModalPrevModalHook = null;
+    }
+  }
+
+  function closePetdexModal() {
+    const modalState = runtime.petdexModal;
+    if (modalState && modalState.searchTimer) clearTimeout(modalState.searchTimer);
+    runtime.petdexModal = null;
+    restorePetdexModalHook();
+    ops.requestRender({ modal: true });
+  }
+
+  function fetchPetdexBrowse(query) {
+    if (!runtime.petdexModal || !window.settingsAPI || typeof window.settingsAPI.browsePetdexPets !== "function") return;
+    runtime.petdexModal.loading = true;
+    runtime.petdexModal.error = null;
+    if (state.activeTab === "theme") ops.requestRender({ modal: true });
+    window.settingsAPI.browsePetdexPets(query)
+      .then((result) => {
+        if (!runtime.petdexModal) return;
+        if (!result || result.status !== "ok") {
+          runtime.petdexModal.pets = [];
+          runtime.petdexModal.error = (result && result.message) || "unknown error";
+          return;
+        }
+        runtime.petdexModal.pets = Array.isArray(result.pets) ? result.pets : [];
+        const selectedSlug = runtime.petdexModal.selectedSlug;
+        if (selectedSlug && !runtime.petdexModal.pets.some((pet) => pet.slug === selectedSlug)) {
+          runtime.petdexModal.selectedSlug = runtime.petdexModal.pets[0] ? runtime.petdexModal.pets[0].slug : null;
+        } else if (!selectedSlug && runtime.petdexModal.pets[0]) {
+          runtime.petdexModal.selectedSlug = runtime.petdexModal.pets[0].slug;
+        }
+      })
+      .catch((err) => {
+        if (!runtime.petdexModal) return;
+        runtime.petdexModal.pets = [];
+        runtime.petdexModal.error = err && err.message ? err.message : String(err);
+      })
+      .finally(() => {
+        if (!runtime.petdexModal) return;
+        runtime.petdexModal.loading = false;
+        if (state.activeTab === "theme") ops.requestRender({ modal: true });
+      });
+  }
+
+  function schedulePetdexSearch(query) {
+    if (!runtime.petdexModal) return;
+    if (runtime.petdexModal.searchTimer) clearTimeout(runtime.petdexModal.searchTimer);
+    runtime.petdexModal.searchTimer = setTimeout(() => {
+      runtime.petdexModal.searchTimer = null;
+      fetchPetdexBrowse(query);
+    }, 250);
+  }
+
+  function buildPetdexAtlasThumb(spritesheetUrl) {
+    const frame = document.createElement("span");
+    frame.className = "petdex-modal-atlas-frame";
+
+    const img = document.createElement("img");
+    img.src = spritesheetUrl;
+    img.alt = "";
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    img.draggable = false;
+    img.addEventListener("error", () => {
+      frame.remove();
+    });
+    frame.appendChild(img);
+    return frame;
+  }
+
+  function renderPetdexModal() {
+    const rootNode = document.getElementById("modalRoot");
+    if (!rootNode || !runtime.petdexModal) return;
+    const modalState = runtime.petdexModal;
+    rootNode.innerHTML = "";
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-backdrop";
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay && !runtime.petdexAdoptPending) closePetdexModal();
+    });
+
+    const modal = document.createElement("div");
+    modal.className = "asset-picker-modal petdex-modal";
+
+    const title = document.createElement("h2");
+    title.textContent = t("themeAdoptPetdex");
+    modal.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "subtitle";
+    subtitle.textContent = t("themeAdoptPetdexHint");
+    modal.appendChild(subtitle);
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "asset-picker-toolbar petdex-modal-toolbar";
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.className = "petdex-search-input";
+    searchInput.placeholder = t("themePetdexModalSearch");
+    searchInput.value = modalState.query || "";
+    searchInput.disabled = !!runtime.petdexAdoptPending;
+    searchInput.addEventListener("input", () => {
+      if (!runtime.petdexModal) return;
+      runtime.petdexModal.query = searchInput.value;
+      schedulePetdexSearch(searchInput.value.trim());
+    });
+    toolbar.appendChild(searchInput);
+
+    const openSiteBtn = document.createElement("button");
+    openSiteBtn.type = "button";
+    openSiteBtn.className = "soft-btn";
+    openSiteBtn.textContent = t("themePetdexOpenSite");
+    openSiteBtn.disabled = !!runtime.petdexAdoptPending;
+    openSiteBtn.addEventListener("click", () => helpers.openExternalSafe("https://petdex.dev"));
+    toolbar.appendChild(openSiteBtn);
+    modal.appendChild(toolbar);
+
+    const list = document.createElement("div");
+    list.className = "asset-picker-list petdex-modal-list";
+    if (modalState.loading) {
+      const loading = document.createElement("div");
+      loading.className = "placeholder-desc";
+      loading.textContent = t("themePetdexModalLoading");
+      list.appendChild(loading);
+    } else if (modalState.error) {
+      const errorNode = document.createElement("div");
+      errorNode.className = "placeholder-desc";
+      errorNode.textContent = formatPetdexBrowseFailed(modalState.error);
+      list.appendChild(errorNode);
+    } else if (!modalState.pets || !modalState.pets.length) {
+      const empty = document.createElement("div");
+      empty.className = "placeholder-desc";
+      empty.textContent = t("themePetdexModalEmpty");
+      list.appendChild(empty);
+    } else {
+      for (const pet of modalState.pets) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "asset-picker-item petdex-modal-item"
+          + (modalState.selectedSlug === pet.slug ? " active" : "");
+        item.disabled = !!runtime.petdexAdoptPending;
+
+        if (pet.spritesheetUrl) {
+          item.appendChild(buildPetdexAtlasThumb(pet.spritesheetUrl));
+        }
+
+        const meta = document.createElement("div");
+        meta.className = "petdex-modal-meta";
+        const nameNode = document.createElement("div");
+        nameNode.className = "petdex-modal-name";
+        nameNode.textContent = pet.displayName || pet.slug;
+        meta.appendChild(nameNode);
+        const slugNode = document.createElement("div");
+        slugNode.className = "petdex-modal-slug";
+        slugNode.textContent = pet.slug;
+        meta.appendChild(slugNode);
+        item.appendChild(meta);
+
+        item.addEventListener("click", () => {
+          if (!runtime.petdexModal || runtime.petdexAdoptPending) return;
+          runtime.petdexModal.selectedSlug = pet.slug;
+          renderPetdexModal();
+        });
+        list.appendChild(item);
+      }
+    }
+    modal.appendChild(list);
+
+    const footer = document.createElement("div");
+    footer.className = "asset-picker-footer";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "soft-btn";
+    cancelBtn.textContent = t("themePetdexModalCancel");
+    cancelBtn.disabled = !!runtime.petdexAdoptPending;
+    cancelBtn.addEventListener("click", closePetdexModal);
+    footer.appendChild(cancelBtn);
+
+    const adoptBtn = document.createElement("button");
+    adoptBtn.type = "button";
+    adoptBtn.className = "soft-btn accent";
+    adoptBtn.textContent = t("themePetdexModalAdopt");
+    adoptBtn.disabled = !!runtime.petdexAdoptPending
+      || modalState.loading
+      || !modalState.selectedSlug;
+    if (runtime.petdexAdoptPending) adoptBtn.classList.add("pending");
+    adoptBtn.addEventListener("click", () => {
+      if (!modalState.selectedSlug) return;
+      adoptPetdexSlug(modalState.selectedSlug, { closeModalOnSuccess: true });
+    });
+    footer.appendChild(adoptBtn);
+    modal.appendChild(footer);
+
+    overlay.appendChild(modal);
+    rootNode.appendChild(overlay);
+    if (!modalState.loading) searchInput.focus();
+  }
+
+  function openPetdexAdoptModal() {
+    if (runtime.petdexModal || runtime.petdexAdoptPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.browsePetdexPets !== "function") return;
+    runtime.petdexModal = {
+      query: "",
+      pets: [],
+      loading: true,
+      error: null,
+      selectedSlug: null,
+      searchTimer: null,
+    };
+    if (renderHooksRef) {
+      runtime.petdexModalPrevModalHook = renderHooksRef.modal;
+      renderHooksRef.modal = function renderThemeModalHook() {
+        if (runtime.petdexModal) {
+          renderPetdexModal();
+          return;
+        }
+        if (typeof runtime.petdexModalPrevModalHook === "function") runtime.petdexModalPrevModalHook();
+      };
+    }
+    fetchPetdexBrowse("");
+    ops.requestRender({ modal: true });
+  }
+
+  function formatPetdexAdoptOk(result) {
+    const imported = result && result.imported;
+    const name = (imported && (imported.displayName || imported.slug || imported.id)) || "";
+    const formatter = t("toastPetdexAdoptOk");
+    return typeof formatter === "function" ? formatter(name) : `Adopted "${name}" from Petdex.`;
+  }
+
+  function formatPetdexAdoptFailed(message) {
+    const formatter = t("toastPetdexAdoptFailed");
+    return typeof formatter === "function" ? formatter(message || "") : `Couldn't adopt Petdex pet: ${message || ""}`;
+  }
+
+  function adoptPetdexSlug(slug, options = {}) {
+    const trimmed = String(slug || "").trim();
+    if (!trimmed) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.adoptPetdexPet !== "function") return;
+    if (runtime.petdexAdoptPending) return;
+
+    runtime.petdexAdoptPending = true;
+    if (state.activeTab === "theme") ops.requestRender({ content: true, modal: true });
+    window.settingsAPI.adoptPetdexPet(trimmed)
+      .then((result) => {
+        if (!result || result.status === "cancel") return null;
+        if (result.status !== "ok") {
+          ops.showToast(formatPetdexAdoptFailed(result && result.message), { error: true });
+          return null;
+        }
+        ops.showToast(formatPetdexAdoptOk(result));
+        if (options.closeModalOnSuccess) closePetdexModal();
+        return ops.fetchThemes().then(() => {
+          if (state.activeTab === "theme") ops.requestRender({ content: true });
+        });
+      })
+      .catch((err) => {
+        ops.showToast(formatPetdexAdoptFailed(err && err.message), { error: true });
+      })
+      .finally(() => {
+        runtime.petdexAdoptPending = false;
+        if (state.activeTab === "theme") ops.requestRender({ content: true, modal: !!runtime.petdexModal });
+      });
+  }
+
+  function handleAdoptPetdexPet() {
+    openPetdexAdoptModal();
+  }
+
+  function onExit() {
+    customizationSelectionSeq += 1;
+    customizingThemeId = null;
+    customizationSelectionPendingThemeId = null;
+    closePetdexModal();
+  }
+
   function formatCodexPetRemoveOk(result) {
     const removed = result && result.removed;
     const name = removed && (removed.displayName || removed.id);
@@ -912,13 +1477,10 @@
     helpers = core.helpers;
     ops = core.ops;
     readers = core.readers;
+    renderHooksRef = core.renderHooks;
     core.tabs.theme = {
       render,
-      onExit() {
-        customizationSelectionSeq += 1;
-        customizingThemeId = null;
-        customizationSelectionPendingThemeId = null;
-      },
+      onExit,
     };
   }
 

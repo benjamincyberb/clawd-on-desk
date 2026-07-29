@@ -161,6 +161,12 @@ async function downloadHttpsBuffer(rawUrl, options = {}) {
       method: "GET",
       path: `${url.pathname}${url.search}`,
       headers: { "User-Agent": "Clawd-Codex-Pet-Importer" },
+      // The guarded lookup returns a single pre-resolved address, so it uses the
+      // legacy cb(null, address, family) signature. Node's default
+      // autoSelectFamily (on since Node 20) instead expects the cb(null, [{...}])
+      // array form and crashes with "Invalid IP address: undefined". Pin the
+      // pre-resolved address to a single connection attempt.
+      autoSelectFamily: false,
       lookup: (_hostname, _opts, cb) => cb(null, resolved.address, resolved.family),
       timeout: options.timeoutMs || 30000,
     }, (res) => {

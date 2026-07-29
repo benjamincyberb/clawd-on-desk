@@ -404,6 +404,18 @@ function resolveHitBoxForSvg(svg) {
   return resolveHitBoxForSvgWithRuntime(svg, hitboxRuntime);
 }
 
+function setMeritStage(stageId) {
+  const activeTheme = ctx.theme;
+  if (!activeTheme || !activeTheme._meritStageProfiles) return false;
+  const { applyMeritStageToTheme } = require("./theme-progression");
+  if (!applyMeritStageToTheme(activeTheme, stageId)) return false;
+  refreshTheme();
+  const resolved = resolveDisplayState();
+  const svg = getSvgOverride(resolved) || resolveVisualBinding(resolved);
+  applyState(resolved, svg);
+  return true;
+}
+
 function refreshTheme() {
   theme = ctx.theme;
   SVG_IDLE_FOLLOW = theme.states.idle[0];
@@ -2632,7 +2644,7 @@ return {
   shouldDropForDnd,
   enableDoNotDisturb, disableDoNotDisturb,
   startStaleCleanup, stopStaleCleanup, startWakePoll, stopWakePoll,
-  getSvgOverride, cleanStaleSessions, startStartupRecovery, refreshTheme,
+  getSvgOverride, cleanStaleSessions, startStartupRecovery, refreshTheme, setMeritStage,
   detectRunningAgentProcesses, buildSessionSnapshot,
   emitSessionSnapshot, broadcastSessionSnapshot, getLastSessionSnapshot,
   getActiveSessionAliasKeys,

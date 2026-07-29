@@ -959,6 +959,8 @@ window.electronAPI.onMiniModeChange((enabled, edge, options) => {
   _inMiniMode = !!enabled && !preEntry;
   miniLeftFlip = !!enabled && edge === "left";
   container.classList.toggle("mini-left", miniLeftFlip);
+  container.classList.toggle("mini-mode", _inMiniMode);
+  container.classList.toggle("mini-transitioning", _miniPreEntryMode);
   applyMiniFlip(clawdEl, currentState);
   if (miniLeftFlip) {
     applyGlyphFlipCompensation(clawdEl);
@@ -970,6 +972,7 @@ window.electronAPI.onMiniModeChange((enabled, edge, options) => {
     applyCloudlingPointerBridge(lastCloudlingPointerPayload);
   }
   refreshAccessoryLayout();
+  syncMeritOverlayVisibility();
 });
 
 // Multi-monitor seam clip: in mini mode at an internal seam, main sends the
@@ -1568,6 +1571,7 @@ function renderStateFile(state, svg) {
   // swapToFile() with the matching state for eye-tracking decisions.
   currentState = state;
   currentRequestedSvg = svg;
+  syncLoopSoundForState(state);
   const requestedSvg = svg;
   const lowPowerStaticImageOverride = resolveLowPowerStaticImageOverride(state, requestedSvg);
   const effectiveSvg = lowPowerStaticImageOverride || requestedSvg;
@@ -2264,6 +2268,73 @@ window.electronAPI.onInvalidateSoundCache((url) => {
   if (typeof url === "string" && url) delete _audioCache[url];
 });
 
+// --- State-loop sounds (theme stateSounds → continuous playback) ---
+// Independent of one-shot playSound (which has a 10s cooldown). Main sends:
+//   loop-sound-config { byState: { working: { sound, mode, url }, ... } }
+//   loop-sound-state  { enabled, volume }  // mute / DND / petHidden / volume
+// Renderer starts/stops on state-change when currentState matches byState.
+let _loopSoundByState = {};
+let _loopSoundGateEnabled = true;
+let _loopSoundGateVolume = 1;
+let _loopSoundActiveState = null;
+let _loopSoundActiveUrl = null;
+let _loopSoundAudio = null;
+
+function stopLoopSound() {
+  if (_loopSoundAudio) {
+    try { _loopSoundAudio.pause(); } catch {}
+    try { _loopSoundAudio.loop = false; } catch {}
+  }
+  _loopSoundAudio = null;
+  _loopSoundActiveState = null;
+  _loopSoundActiveUrl = null;
+}
+
+function syncLoopSoundForState(state) {
+  const entry = state && _loopSoundByState ? _loopSoundByState[state] : null;
+  const wantUrl = entry && entry.mode === "loop" && entry.url ? entry.url : null;
+  if (!_loopSoundGateEnabled || !wantUrl) {
+    stopLoopSound();
+    return;
+  }
+  if (_loopSoundActiveState === state && _loopSoundActiveUrl === wantUrl && _loopSoundAudio) {
+    _loopSoundAudio.volume = _loopSoundGateVolume;
+    return;
+  }
+  stopLoopSound();
+  const audio = cacheAudio(wantUrl);
+  if (!audio) return;
+  audio.loop = true;
+  audio.volume = _loopSoundGateVolume;
+  _loopSoundAudio = audio;
+  _loopSoundActiveState = state;
+  _loopSoundActiveUrl = wantUrl;
+  // Loop sounds are preloaded via syncSoundPreloads; start immediately so the
+  // knock tracks the state change without waiting on the one-shot warmup path.
+  try { audio.currentTime = 0; } catch {}
+  audio.play().catch((err) => reportSoundPlaybackError("loop", err));
+}
+
+if (window.electronAPI && typeof window.electronAPI.onLoopSoundConfig === "function") {
+  window.electronAPI.onLoopSoundConfig((payload) => {
+    _loopSoundByState = (payload && payload.byState && typeof payload.byState === "object")
+      ? payload.byState
+      : {};
+    syncLoopSoundForState(currentState);
+  });
+}
+
+if (window.electronAPI && typeof window.electronAPI.onLoopSoundState === "function") {
+  window.electronAPI.onLoopSoundState((payload) => {
+    _loopSoundGateEnabled = !(payload && payload.enabled === false);
+    _loopSoundGateVolume = typeof payload === "object" && payload && typeof payload.volume === "number"
+      ? Math.max(0, Math.min(1, payload.volume))
+      : 1;
+    if (_loopSoundAudio) _loopSoundAudio.volume = _loopSoundGateVolume;
+    syncLoopSoundForState(currentState);
+  });
+}
+
 // --- Wake from doze (smooth eye opening) ---
 window.electronAPI.onWakeFromDoze(() => {
   if (clawdEl && clawdEl.tagName === "OBJECT" && clawdEl.contentDocument) {
@@ -2278,4 +2349,159 @@ window.electronAPI.onWakeFromDoze(() => {
 if (!currentDisplayedSvg && _initialIdleSvg) {
   currentIdleSvg = _initialIdleSvg;
   swapToFile(_initialIdleSvg, "idle");
+}
+
+// --- Merit cultivator overlay (renderer-embedded; no extra BrowserWindow) ---
+const meritOverlayEl = document.getElementById("merit-overlay");
+const meritStageEl = document.getElementById("merit-stage-name");
+const meritValueEl = document.getElementById("merit-value");
+const meritValueCapEl = document.getElementById("merit-value-cap");
+const meritBarEl = meritOverlayEl ? meritOverlayEl.querySelector(".merit-bar") : null;
+const meritBarFillEl = document.getElementById("merit-bar-fill");
+const meritAwardPopEl = document.getElementById("merit-award-pop");
+const meritLiveEl = document.getElementById("merit-live");
+const meritLevelToastEl = document.getElementById("merit-level-toast");
+
+let _meritStatus = null;
+let _meritOverlayPref = true;
+let _meritBumpTimer = null;
+let _meritAwardTimer = null;
+let _meritToastTimer = null;
+
+function syncMeritOverlayVisibility() {
+  if (!meritOverlayEl) return;
+  const show = !!(
+    _meritStatus
+    && _meritStatus.enabled
+    && _meritOverlayPref
+    && !_inMiniMode
+    && !_miniPreEntryMode
+  );
+  meritOverlayEl.hidden = !show;
+  meritOverlayEl.setAttribute("aria-hidden", show ? "false" : "true");
+  if (container) container.classList.toggle("merit-hud-active", show);
+  if (!show && meritLevelToastEl) {
+    meritLevelToastEl.hidden = true;
+    meritLevelToastEl.classList.remove("show");
+    meritLevelToastEl.setAttribute("aria-hidden", "true");
+  }
+}
+
+function formatMeritNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return "0";
+  return String(Math.floor(n));
+}
+
+function applyMeritStatus(payload) {
+  if (!payload || typeof payload !== "object") {
+    _meritStatus = null;
+    syncMeritOverlayVisibility();
+    return;
+  }
+  _meritStatus = payload;
+  if (typeof payload.overlayEnabled === "boolean") {
+    _meritOverlayPref = payload.overlayEnabled;
+  }
+  if (meritStageEl) {
+    meritStageEl.textContent = payload.stageNameText
+      || payload.stageName
+      || payload.stageId
+      || "";
+  }
+  if (meritValueEl) {
+    meritValueEl.textContent = formatMeritNumber(payload.merit);
+  }
+  if (meritValueCapEl) {
+    const nextRequired = Number(payload.nextRequiredMerit);
+    if (Number.isFinite(nextRequired) && nextRequired > 0) {
+      meritValueCapEl.textContent = formatMeritNumber(nextRequired);
+      meritValueCapEl.hidden = false;
+    } else {
+      meritValueCapEl.textContent = "";
+      meritValueCapEl.hidden = true;
+    }
+  }
+  const pct = Number.isFinite(payload.progressPct)
+    ? Math.max(0, Math.min(100, payload.progressPct))
+    : (Number.isFinite(payload.ratio) ? Math.max(0, Math.min(100, payload.ratio * 100)) : 0);
+  if (meritBarFillEl) meritBarFillEl.style.width = `${pct}%`;
+  if (meritBarEl) {
+    meritBarEl.setAttribute("aria-valuenow", String(Math.round(pct)));
+  }
+  if (meritOverlayEl) {
+    meritOverlayEl.classList.toggle("is-maxed", pct >= 100);
+  }
+  syncMeritOverlayVisibility();
+}
+
+function bumpMeritValue() {
+  if (!meritValueEl) return;
+  meritValueEl.classList.add("merit-bump");
+  if (_meritBumpTimer) clearTimeout(_meritBumpTimer);
+  _meritBumpTimer = setTimeout(() => {
+    meritValueEl.classList.remove("merit-bump");
+  }, 180);
+}
+
+function showMeritAwardPop(amount) {
+  if (!meritAwardPopEl || !Number.isFinite(amount) || amount <= 0) return;
+  if (amount < 10) {
+    bumpMeritValue();
+    return;
+  }
+  meritAwardPopEl.textContent = `+${Math.floor(amount)}`;
+  meritAwardPopEl.classList.add("show");
+  if (_meritAwardTimer) clearTimeout(_meritAwardTimer);
+  _meritAwardTimer = setTimeout(() => {
+    meritAwardPopEl.classList.remove("show");
+  }, 900);
+}
+
+function announceMerit(text) {
+  if (!meritLiveEl || !text) return;
+  meritLiveEl.textContent = "";
+  // Force polite live region refresh.
+  void meritLiveEl.offsetWidth;
+  meritLiveEl.textContent = text;
+}
+
+function showMeritLevelToast(payload) {
+  if (!meritLevelToastEl) return;
+  const stageName = (payload && (payload.stageNameText || payload.stageName || payload.stageId)) || "";
+  const title = (payload && payload.title) || "Realm breakthrough";
+  meritLevelToastEl.textContent = stageName ? `${title} · ${stageName}` : title;
+  meritLevelToastEl.hidden = false;
+  meritLevelToastEl.setAttribute("aria-hidden", "false");
+  meritLevelToastEl.classList.remove("show");
+  void meritLevelToastEl.offsetWidth;
+  meritLevelToastEl.classList.add("show");
+  announceMerit(meritLevelToastEl.textContent);
+  if (_meritToastTimer) clearTimeout(_meritToastTimer);
+  _meritToastTimer = setTimeout(() => {
+    meritLevelToastEl.classList.remove("show");
+    meritLevelToastEl.hidden = true;
+    meritLevelToastEl.setAttribute("aria-hidden", "true");
+  }, 2800);
+}
+
+if (window.electronAPI && typeof window.electronAPI.onMeritStatus === "function") {
+  window.electronAPI.onMeritStatus((payload) => applyMeritStatus(payload));
+}
+if (window.electronAPI && typeof window.electronAPI.onMeritAward === "function") {
+  window.electronAPI.onMeritAward((payload) => {
+    const award = payload && payload.award ? payload.award : payload;
+    const amount = award && Number(award.amount);
+    if (Number.isFinite(amount) && amount > 0) showMeritAwardPop(amount);
+    if (payload && payload.status) applyMeritStatus(payload.status);
+    if (award && (award.type === "daily" || award.type === "streak")) {
+      announceMerit(`+${Math.floor(amount)}`);
+    }
+  });
+}
+if (window.electronAPI && typeof window.electronAPI.onMeritLevelUp === "function") {
+  window.electronAPI.onMeritLevelUp((payload) => {
+    if (payload && payload.status) applyMeritStatus(payload.status);
+    showMeritLevelToast(payload);
+  });
 }

@@ -114,6 +114,8 @@
       state: null,
       pollTimer: null,
     },
+    petdexModal: null,
+    petdexModalPrevModalHook: null,
     shortcutFailures: {},
     shortcutFailureToastShown: false,
     about: {
@@ -1498,6 +1500,7 @@
     clearMountedControls,
     syncMountedSizeControl,
     showToast,
+    showSettingsConfirmModal,
     enterShortcutRecording,
     finishShortcutRecording,
     handleShortcutRecordKey,

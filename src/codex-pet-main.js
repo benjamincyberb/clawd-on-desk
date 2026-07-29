@@ -6,6 +6,7 @@ const { pathToFileURL } = require("url");
 
 const defaultCodexPetAdapter = require("./codex-pet-adapter");
 const defaultCodexPetImporter = require("./codex-pet-importer");
+const defaultPetdexClient = require("./petdex-client");
 
 const REGISTER_PROTOCOL_DEV_ARG = "--register-protocol";
 const CLAWD_PROTOCOL_SCHEME = "clawd";
@@ -103,6 +104,7 @@ function createCodexPetMain(options = {}) {
   const path = options.path || defaultPath;
   const codexPetAdapter = options.codexPetAdapter || defaultCodexPetAdapter;
   const codexPetImporter = options.codexPetImporter || defaultCodexPetImporter;
+  const petdexClient = options.petdexClient || defaultPetdexClient;
 
   const pendingImportUrls = [];
   let importFlushRunning = false;
@@ -648,6 +650,61 @@ function createCodexPetMain(options = {}) {
     }
   }
 
+  // Fetch the Petdex catalog for the browse UI. Returns a trimmed pet list so
+  // the renderer isn't handed the full multi-thousand-entry manifest.
+  async function browsePetdexPets(options = {}) {
+    try {
+      const manifest = await petdexClient.fetchPetdexManifest();
+      const query = typeof options.query === "string" ? options.query : "";
+      const limit = Number.isFinite(options.limit) ? options.limit : 60;
+      const pets = petdexClient.searchPetdexPets(manifest, query, { limit }).map((pet) => ({
+        slug: pet.slug,
+        displayName: pet.displayName,
+        kind: pet.kind,
+        submittedBy: pet.submittedBy,
+        spritesheetUrl: pet.spritesheetUrl,
+      }));
+      return { status: "ok", total: manifest.total, generatedAt: manifest.generatedAt, pets };
+    } catch (err) {
+      console.warn("Clawd: settings:browse-petdex-pets failed:", err && err.message);
+      return { status: "error", message: (err && err.message) || String(err) };
+    }
+  }
+
+  // Adopt (download + install + activate) a single Petdex pet by slug. Reuses the
+  // Codex Pet import + materialize pipeline, so an installed Petdex pet becomes a
+  // first-class managed Clawd theme just like a locally-imported Codex Pet.
+  async function adoptPetdexPet(slug) {
+    if (typeof slug !== "string" || !slug.trim()) {
+      return { status: "error", message: "a petdex pet slug is required" };
+    }
+    try {
+      const manifest = await petdexClient.fetchPetdexManifest();
+      const pet = petdexClient.findPetdexPet(manifest, slug.trim());
+      if (!pet) return { status: "error", message: `petdex pet not found: ${slug.trim()}` };
+
+      const imported = await petdexClient.installPetdexPet({
+        pet,
+        confirmReplaceExistingPackage,
+      });
+      const activated = await materializeAndActivateImportedPet(imported);
+      return {
+        status: "ok",
+        themeId: activated.themeId,
+        summary: activated.summary,
+        imported: {
+          id: imported.packageInfo.id,
+          displayName: imported.packageInfo.displayName || pet.displayName,
+          slug: pet.slug,
+        },
+      };
+    } catch (err) {
+      if (err && err.code === codexPetImporter.ERR_REPLACE_DECLINED) return { status: "cancel" };
+      console.warn("Clawd: petdex adopt failed:", err && err.message);
+      return { status: "error", message: (err && err.message) || String(err) };
+    }
+  }
+
   async function removeCodexPet(themeId) {
     if (typeof themeId !== "string" || !themeId) return { status: "error", message: "themeId is required" };
     const target = resolveRemovalTarget(themeId);
@@ -720,6 +777,8 @@ function createCodexPetMain(options = {}) {
     isManagedTheme: (themeId) => !!readManagedThemeMarker(themeId),
     mergeSyncSummaries: mergeCodexPetSyncSummaries,
     openCodexPetsDir,
+    browsePetdexPets,
+    adoptPetdexPet,
     readManagedThemeMarker,
     refreshFromSettings,
     registerProtocolClient,

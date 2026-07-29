@@ -597,6 +597,24 @@ const updateRegistry = {
   // exists so applyCommand's commit re-validation accepts the key.
   idleVisual: requirePlainObject("idleVisual"),
 
+  meritProgress(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { status: "error", message: "meritProgress must be a plain object" };
+    }
+    for (const themeId of Object.keys(value)) {
+      if (typeof themeId !== "string" || !themeId) {
+        return { status: "error", message: "meritProgress keys must be non-empty strings" };
+      }
+      const bucket = value[themeId];
+      if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) {
+        return { status: "error", message: `meritProgress["${themeId}"] must be a plain object` };
+      }
+    }
+    return { status: "ok" };
+  },
+
+  meritOverlayEnabled: requireBoolean("meritOverlayEnabled"),
+
   // Remote SSH profile store. Plain validator — actual CRUD goes through
   // commandRegistry below to keep id-uniqueness, default-fill, and
   // monotonic createdAt logic in one place. The validator only ensures the
@@ -1087,6 +1105,70 @@ function setIdleVisual(payload, deps) {
   if (nextMap[themeId] === nextFile) return { status: "ok", noop: true };
   nextMap[themeId] = nextFile;
   return { status: "ok", commit: { idleVisual: nextMap } };
+}
+
+function resetMeritProgress(payload, deps) {
+  const confirmed = !!(payload && typeof payload === "object" && payload.confirmed === true);
+  if (!confirmed) {
+    return { status: "error", message: "resetMeritProgress requires confirmed:true" };
+  }
+  if (!deps || typeof deps.resetMeritProgress !== "function") {
+    return { status: "error", message: "resetMeritProgress requires deps.resetMeritProgress" };
+  }
+  try {
+    const result = deps.resetMeritProgress({ confirmed: true });
+    if (result && result.status === "error") return result;
+    const snapshot = deps.snapshot || {};
+    const themeId = (result && result.themeId)
+      || snapshot.theme
+      || "cultivator";
+    const nextMap = { ...(snapshot.meritProgress || {}) };
+    nextMap[themeId] = (result && result.progress) || {
+      merit: 0,
+      dayKey: null,
+      dailyEarned: 0,
+      lastActiveDayKey: null,
+      streakDays: 0,
+      introSeen: true,
+    };
+    return {
+      status: "ok",
+      commit: { meritProgress: nextMap },
+    };
+  } catch (err) {
+    return { status: "error", message: `resetMeritProgress: ${err && err.message}` };
+  }
+}
+
+function previewMeritStage(payload, deps) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "previewMeritStage requires { themeId?, stageId }" };
+  }
+  if (!deps || typeof deps.previewMeritStage !== "function") {
+    return { status: "error", message: "previewMeritStage requires deps.previewMeritStage" };
+  }
+  try {
+    const result = deps.previewMeritStage(payload);
+    if (!result || result.status === "error") {
+      return result || { status: "error", message: "previewMeritStage failed" };
+    }
+    const snapshot = deps.snapshot || {};
+    const themeId = result.themeId
+      || (typeof payload.themeId === "string" && payload.themeId)
+      || snapshot.theme
+      || "cultivator";
+    const nextMap = { ...(snapshot.meritProgress || {}) };
+    if (result.progress) {
+      nextMap[themeId] = result.progress;
+    }
+    return {
+      status: "ok",
+      stageId: result.stageId,
+      commit: { meritProgress: nextMap },
+    };
+  } catch (err) {
+    return { status: "error", message: `previewMeritStage: ${err && err.message}` };
+  }
 }
 
 function resizePet(payload, deps) {
@@ -2010,6 +2092,8 @@ const commandRegistry = {
   setWideHitboxOverride,
   setThemeSelection,
   setIdleVisual,
+  resetMeritProgress,
+  previewMeritStage,
   "remoteSsh.add": remoteSshAddProfile,
   "remoteSsh.update": remoteSshUpdateProfile,
   "remoteSsh.delete": remoteSshDeleteProfile,

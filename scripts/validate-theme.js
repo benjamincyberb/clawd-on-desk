@@ -629,6 +629,56 @@ for (const [key, value] of Object.entries(capabilities)) {
   console.log(`  ${PASS} ${key}: ${value}`);
 }
 
+// ── Merit Cultivator (builtin-only progression overlay) ──
+{
+  const { normalizeMeritCultivator, collectProgressionAssetFiles } = require("../src/theme-progression");
+  const pathParts = resolvedDir.split(path.sep);
+  const themesIdx = pathParts.lastIndexOf("themes");
+  const looksBuiltin = themesIdx >= 0
+    && pathParts[themesIdx + 1]
+    && !resolvedDir.includes(`${path.sep}userData${path.sep}`)
+    && fs.existsSync(path.join(resolvedDir, "..", "..", "package.json"));
+  const meritCap = normalizeMeritCultivator(raw, { isBuiltin: looksBuiltin });
+
+  if (isPlainObject(raw.meritCultivator) && raw.meritCultivator.enabled === true) {
+    console.log(`\n${C}[Merit Cultivator]${D}`);
+    if (!looksBuiltin) {
+      warn(false, "meritCultivator.enabled is ignored for external/user themes (builtin-only)");
+    } else if (!meritCap.enabled) {
+      check(false, "meritCultivator.enabled but stages/params failed normalization");
+    } else {
+      check(true, `meritCultivator enabled with ${meritCap.stages.length} stage(s)`);
+      const ids = new Set();
+      for (let i = 0; i < meritCap.stages.length; i++) {
+        const stage = meritCap.stages[i];
+        check(!ids.has(stage.id), `stage id unique: ${stage.id}`);
+        ids.add(stage.id);
+        if (i === 0) check(stage.requiredMerit === 0, `first stage requiredMerit === 0 (got ${stage.requiredMerit})`);
+        if (i > 0) {
+          check(
+            stage.requiredMerit > meritCap.stages[i - 1].requiredMerit,
+            `stage "${stage.id}" threshold strictly increases`
+          );
+        }
+        const nameOk = typeof stage.name === "string"
+          || (isPlainObject(stage.name) && Object.keys(stage.name).length > 0);
+        check(nameOk, `stage "${stage.id}" has a localized name`);
+      }
+      const progressionFiles = collectProgressionAssetFiles(meritCap.stages);
+      const assetsDir = assetsOverride || path.join(resolvedDir, "assets");
+      for (const file of progressionFiles) {
+        const abs = path.join(assetsDir, file);
+        check(fs.existsSync(abs), `progression asset exists: ${file}`);
+      }
+      check(meritCap.params.dailyCap >= 1, `params.dailyCap >= 1 (got ${meritCap.params.dailyCap})`);
+      check(meritCap.params.meritPerSec >= 0, `params.meritPerSec >= 0`);
+    }
+  } else if (meritCap.enabled) {
+    console.log(`\n${C}[Merit Cultivator]${D}`);
+    console.log(`  ${PASS} meritCultivator: enabled`);
+  }
+}
+
 // ── Summary ──
 console.log(`\n${"─".repeat(40)}`);
 if (errors === 0 && warnings === 0) {

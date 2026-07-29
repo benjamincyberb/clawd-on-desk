@@ -2,6 +2,7 @@
 
 const defaultFs = require("fs");
 const defaultPath = require("path");
+const { resolveProgressionStageFromBucket } = require("./theme-progression");
 
 // Design invariant: this closure is the only active-theme owner. theme-loader
 // stays a stateless loader; legacy active facades must delegate here.
@@ -68,6 +69,9 @@ function createThemeRuntime(options = {}) {
   function loadInitialTheme(themeId, opts = {}) {
     const theme = themeLoader.loadTheme(themeId, opts);
     theme._overrideSignature = JSON.stringify(opts.overrides || {});
+    if (opts.progressionStageId) {
+      theme._progressionStageId = opts.progressionStageId;
+    }
     return setActiveTheme(theme);
   }
 
@@ -121,6 +125,10 @@ function createThemeRuntime(options = {}) {
     return activeThemeContext ? activeThemeContext.getPreviewSoundUrl() : null;
   }
 
+  function getStateSoundUrls() {
+    return activeThemeContext ? activeThemeContext.getStateSoundUrls() : {};
+  }
+
   function activateTheme(themeId, variantId) {
     const renderWin = getRenderWindow();
     if (!isLiveWindow(renderWin)) {
@@ -135,21 +143,63 @@ function createThemeRuntime(options = {}) {
     const currentOverrides = settingsController.get("themeOverrides") || {};
     const targetOverrideMap = arguments.length >= 3 ? arguments[2] : (currentOverrides[themeId] || null);
     const targetOverrideSignature = JSON.stringify(targetOverrideMap || {});
+    const requestedProgressionStageId = (
+      activateOptions
+      && typeof activateOptions.progressionStageId === "string"
+      && activateOptions.progressionStageId
+    ) ? activateOptions.progressionStageId : null;
+    let resolvedProgressionStageId = requestedProgressionStageId;
+    if (!resolvedProgressionStageId) {
+      try {
+        const meta = themeLoader.getThemeMetadata(themeId);
+        const meritCap = meta && meta.capabilities && meta.capabilities.meritCultivator;
+        if (meritCap && meritCap.enabled && Array.isArray(meritCap.stages)) {
+          const bucket = (settingsController.get("meritProgress") || {})[themeId];
+          resolvedProgressionStageId = resolveProgressionStageFromBucket(bucket, meritCap.stages);
+        }
+      } catch {
+        resolvedProgressionStageId = null;
+      }
+    }
+    const onReloadFinishedCb = (
+      activateOptions
+      && typeof activateOptions.onReloadFinished === "function"
+    ) ? activateOptions.onReloadFinished : null;
+    const forceReload = !!(activateOptions && activateOptions.forceReload === true);
 
     if (
       activeTheme &&
       activeTheme._id === themeId &&
       activeTheme._variantId === targetVariant &&
       (activeTheme._overrideSignature || "{}") === targetOverrideSignature &&
-      !(activateOptions && activateOptions.forceReload === true)
+      !forceReload
     ) {
-      return { themeId, variantId: activeTheme._variantId };
+      const meritCap = activeTheme._capabilities && activeTheme._capabilities.meritCultivator;
+      if (!(meritCap && meritCap.enabled)) {
+        return {
+          themeId,
+          variantId: activeTheme._variantId,
+          progressionStageId: null,
+        };
+      }
+      const desiredProgression = resolvedProgressionStageId
+        || activeTheme._progressionStageId
+        || (meritCap.stages && meritCap.stages[0] && meritCap.stages[0].id)
+        || null;
+      if ((activeTheme._progressionStageId || null) === desiredProgression) {
+        return {
+          themeId,
+          variantId: activeTheme._variantId,
+          progressionStageId: activeTheme._progressionStageId || null,
+        };
+      }
     }
 
     const newTheme = themeLoader.loadTheme(themeId, {
       strict: true,
       variant: targetVariant,
       overrides: targetOverrideMap,
+      progressionStageId: resolvedProgressionStageId || undefined,
     });
     newTheme._overrideSignature = targetOverrideSignature;
 
@@ -219,6 +269,9 @@ function createThemeRuntime(options = {}) {
       if (animationOverrides && typeof animationOverrides.runPendingPostReloadTasks === "function") {
         animationOverrides.runPendingPostReloadTasks();
       }
+      if (onReloadFinishedCb) {
+        try { onReloadFinishedCb(); } catch {}
+      }
     };
 
     const sequencer = getFadeSequencer();
@@ -228,17 +281,25 @@ function createThemeRuntime(options = {}) {
     });
 
     flushRuntimeStateToPrefs();
-    return { themeId, variantId: newTheme._variantId };
+    return {
+      themeId,
+      variantId: newTheme._variantId,
+      progressionStageId: newTheme._progressionStageId || null,
+    };
   }
 
-  function reloadActiveTheme() {
+  function reloadActiveTheme(activateOptions = null) {
     if (!activeTheme) throw new Error("active theme is not loaded");
     const currentOverrides = settingsController.get("themeOverrides") || {};
     return activateTheme(
       activeTheme._id,
       activeTheme._variantId || "default",
       currentOverrides[activeTheme._id] || null,
-      { forceReload: true }
+      {
+        forceReload: true,
+        progressionStageId: activeTheme._progressionStageId || null,
+        ...(activateOptions && typeof activateOptions === "object" ? activateOptions : {}),
+      }
     );
   }
 
@@ -257,6 +318,7 @@ function createThemeRuntime(options = {}) {
       strict: true,
       variant: targetVariant,
       overrides: overrideMap,
+      progressionStageId: activeTheme._progressionStageId || undefined,
     });
     newTheme._overrideSignature = targetOverrideSignature;
     setActiveTheme(newTheme);
@@ -320,6 +382,7 @@ function createThemeRuntime(options = {}) {
     getHitRendererConfig,
     getSoundUrl,
     getPreviewSoundUrl,
+    getStateSoundUrls,
     getThemeInfo,
     removeThemeDir,
     isReloadInProgress,

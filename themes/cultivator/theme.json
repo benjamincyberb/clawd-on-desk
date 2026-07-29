@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 1,
+  "name": "Cultivator",
+  "author": "clawd-on-desk",
+  "version": "1.0.0",
+  "description": "Merit cultivator desk pet — knock the wooden fish while your coding agents work.",
+  "preview": "mortal-idle.svg",
+  "viewBox": {
+    "x": -8,
+    "y": -6,
+    "width": 32,
+    "height": 32
+  },
+  "layout": {
+    "contentBox": {
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 20
+    },
+    "centerX": 8,
+    "baselineY": 20,
+    "visibleHeightRatio": 0.62,
+    "baselineBottomRatio": 0.06
+  },
+  "eyeTracking": {
+    "enabled": false,
+    "states": [
+      "idle"
+    ],
+    "eyeRatioX": 0.5,
+    "eyeRatioY": 0.42,
+    "maxOffset": 2.2,
+    "bodyScale": 0.28,
+    "shadowStretch": 0.12,
+    "shadowShift": 0.25,
+    "ids": {
+      "eyes": "eyes-js",
+      "body": "body-js",
+      "shadow": "shadow-js"
+    },
+    "shadowOrigin": "8px 19px"
+  },
+  "sleepSequence": {
+    "mode": "direct"
+  },
+  "sounds": {
+    "knock": "knock.wav"
+  },
+  "stateSounds": {
+    "working": {
+      "sound": "knock",
+      "mode": "loop"
+    },
+    "juggling": {
+      "sound": "knock",
+      "mode": "loop"
+    },
+    "thinking": {
+      "sound": "knock",
+      "mode": "loop"
+    }
+  },
+  "states": {
+    "idle": [
+      "mortal-idle.svg"
+    ],
+    "thinking": [
+      "mortal-thinking.svg"
+    ],
+    "working": [
+      "mortal-working.svg"
+    ],
+    "juggling": [
+      "mortal-working.svg"
+    ],
+    "attention": [
+      "mortal-attention.svg"
+    ],
+    "error": [
+      "mortal-error.svg"
+    ],
+    "notification": [
+      "mortal-attention.svg"
+    ],
+    "sleeping": [
+      "mortal-sleeping.svg"
+    ],
+    "sweeping": {
+      "fallbackTo": "working"
+    },
+    "carrying": {
+      "fallbackTo": "working"
+    }
+  },
+  "workingTiers": [
+    {
+      "minSessions": 1,
+      "file": "mortal-working.svg"
+    }
+  ],
+  "hitBoxes": {
+    "default": {
+      "x": 0,
+      "y": 2,
+      "w": 16,
+      "h": 16
+    },
+    "sleeping": {
+      "x": 0,
+      "y": 6,
+      "w": 16,
+      "h": 12
+    }
+  },
+  "objectScale": {
+    "widthRatio": 1.85,
+    "heightRatio": 1.55,
+    "offsetX": -0.32,
+    "offsetY": -0.22
+  },
+  "meritCultivator": {
+    "enabled": true,
+    "params": {
+      "meritPerSec": 1,
+      "meritPerTick": 1,
+      "meritTickMs": 550,
+      "completionMerit": 50,
+      "errorMerit": 5,
+      "maxMeritPerSec": 1,
+      "minEventCooldownMs": 1000,
+      "dailyBonus": 0,
+      "streakDays": 7,
+      "streakBonus": 0,
+      "dailyCap": 10000
+    },
+    "stages": [
+      {
+        "id": "mortal",
+        "requiredMerit": 0,
+        "name": {
+          "en": "Mortal",
+          "zh": "凡人",
+          "zh-TW": "凡人",
+          "ko": "범인",
+          "ja": "凡人"
+        }
+      },
+      {
+        "id": "adept",
+        "requiredMerit": 5,
+        "name": {
+          "en": "Adept",
+          "zh": "修行者",
+          "zh-TW": "修行者",
+          "ko": "수행자",
+          "ja": "修行者"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "adept-idle.svg"
+            ],
+            "thinking": [
+              "adept-thinking.svg"
+            ],
+            "working": [
+              "adept-working.svg"
+            ],
+            "juggling": [
+              "adept-working.svg"
+            ],
+            "attention": [
+              "adept-attention.svg"
+            ],
+            "error": [
+              "adept-error.svg"
+            ],
+            "notification": [
+              "adept-attention.svg"
+            ],
+            "sleeping": [
+              "adept-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "adept-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "novice",
+        "requiredMerit": 50,
+        "name": {
+          "en": "Novice Monk",
+          "zh": "小和尚",
+          "zh-TW": "小和尚",
+          "ko": "소승",
+          "ja": "小僧"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "novice-idle.svg"
+            ],
+            "thinking": [
+              "novice-thinking.svg"
+            ],
+            "working": [
+              "novice-working.svg"
+            ],
+            "juggling": [
+              "novice-working.svg"
+            ],
+            "attention": [
+              "novice-attention.svg"
+            ],
+            "error": [
+              "novice-error.svg"
+            ],
+            "notification": [
+              "novice-attention.svg"
+            ],
+            "sleeping": [
+              "novice-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "novice-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "arhat",
+        "requiredMerit": 150,
+        "name": {
+          "en": "Arhat",
+          "zh": "罗汉",
+          "zh-TW": "羅漢",
+          "ko": "나한",
+          "ja": "羅漢"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "arhat-idle.svg"
+            ],
+            "thinking": [
+              "arhat-thinking.svg"
+            ],
+            "working": [
+              "arhat-working.svg"
+            ],
+            "juggling": [
+              "arhat-working.svg"
+            ],
+            "attention": [
+              "arhat-attention.svg"
+            ],
+            "error": [
+              "arhat-error.svg"
+            ],
+            "notification": [
+              "arhat-attention.svg"
+            ],
+            "sleeping": [
+              "arhat-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "arhat-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "bodhisattva",
+        "requiredMerit": 300,
+        "name": {
+          "en": "Bodhisattva",
+          "zh": "菩萨",
+          "zh-TW": "菩薩",
+          "ko": "보살",
+          "ja": "菩薩"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "bodhisattva-idle.svg"
+            ],
+            "thinking": [
+              "bodhisattva-thinking.svg"
+            ],
+            "working": [
+              "bodhisattva-working.svg"
+            ],
+            "juggling": [
+              "bodhisattva-working.svg"
+            ],
+            "attention": [
+              "bodhisattva-attention.svg"
+            ],
+            "error": [
+              "bodhisattva-error.svg"
+            ],
+            "notification": [
+              "bodhisattva-attention.svg"
+            ],
+            "sleeping": [
+              "bodhisattva-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "bodhisattva-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "buddha",
+        "requiredMerit": 500,
+        "name": {
+          "en": "Buddha",
+          "zh": "佛祖",
+          "zh-TW": "佛祖",
+          "ko": "불",
+          "ja": "仏祖"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "buddha-idle.svg"
+            ],
+            "thinking": [
+              "buddha-thinking.svg"
+            ],
+            "working": [
+              "buddha-working.svg"
+            ],
+            "juggling": [
+              "buddha-working.svg"
+            ],
+            "attention": [
+              "buddha-attention.svg"
+            ],
+            "error": [
+              "buddha-error.svg"
+            ],
+            "notification": [
+              "buddha-attention.svg"
+            ],
+            "sleeping": [
+              "buddha-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "buddha-working.svg"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -31,8 +31,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Sound playback (from main)
   onPreloadSounds: (cb) => ipcRenderer.on("preload-sounds", (_, payload) => cb(payload)),
   onPlaySound: (cb) => ipcRenderer.on("play-sound", (_, payload) => cb(payload)),
+  onLoopSoundConfig: (cb) => ipcRenderer.on("loop-sound-config", (_, payload) => cb(payload)),
+  onLoopSoundState: (cb) => ipcRenderer.on("loop-sound-state", (_, payload) => cb(payload)),
   onInvalidateSoundCache: (cb) => ipcRenderer.on("invalidate-sound-cache", (_, url) => cb(url)),
   reportSoundPlaybackError: (payload) => ipcRenderer.send("sound-playback-error", payload),
+  // Merit cultivator overlay (renderer-embedded)
+  onMeritStatus: (cb) => ipcRenderer.on("merit-status", (_, payload) => cb(payload)),
+  onMeritAward: (cb) => ipcRenderer.on("merit-award", (_, payload) => cb(payload)),
+  onMeritLevelUp: (cb) => ipcRenderer.on("merit-level-up", (_, payload) => cb(payload)),
   // Render window → main (cursor polling control during reactions)
   pauseCursorPolling: () => ipcRenderer.send("pause-cursor-polling"),
   resumeFromReaction: () => ipcRenderer.send("resume-from-reaction"),

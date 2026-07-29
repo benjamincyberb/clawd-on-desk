@@ -20,6 +20,9 @@ docs/**
 !docs/guides/copilot-setup.md
 !docs/guides/copilot-setup.zh-CN.md
 !docs/guides/guide-theme-creation.md
+!docs/guides/cultivator-asset-standard.md
+!docs/guides/cultivator-asset-pipeline.md
+!docs/guides/cultivator-asset-lessons.md
 !docs/guides/known-limitations.md
 !docs/guides/known-limitations.zh-CN.md
 !docs/guides/setup-guide.md
@@ -42,6 +45,8 @@ docs/**
 !docs/project/agent-runtime-architecture.md
 !docs/project/release-process.md
 !docs/project/theme-state-ui.md
+!docs/project/merit-cultivator-prd.md
+!docs/project/cultivator-promo-brief.md
 !docs/cloudling/
 !docs/cloudling/specs/
 !docs/cloudling/specs/core-states.md
@@ -65,34 +70,31 @@ docs/**
 .tmp_*
 .tmp-*
 *.tmp
-
 # Root-level scratch files (tmp-*.md / tmp-*.json / tmp-*.sh etc.)
 # Matches files like tmp-pr301-comment.md, tmp-issues.json at repo root only.
 /tmp-*
-
 # Local manual test / tuning scratch docs (root-level dotfile md)
 .*-test-*.md
 .*-tune-*.md
 .*-tune.md
-
-
 # Calico animation studio (WIP pipeline, not for distribution)
 calico-studio/
-
 # WIP artwork (unpublished, All Rights Reserved)
 tools/calico-*
 !tools/calico-final.svg
-
 # Internal pipeline tools (not for distribution)
 tools/chroma_key.py
 tools/fix_gray_bleed.py
 tools/rebuild_apng.py
 tools/check_dark.py
 !tools/calico-test.html
-
 # Debug logs
 logs/
-
+# Telegram approval sidecar build artifacts
+bin/cc-connect-clawd/*/cc-connect-clawd
+bin/cc-connect-clawd/*/cc-connect-clawd.exe
+!bin/cc-connect-clawd/
+!bin/cc-connect-clawd/README.md
 # GIF recording tools (not part of main project)
 scripts/*
 !scripts/remote-deploy.sh
@@ -105,9 +107,26 @@ scripts/*
 !scripts/verify-electron-install.js
 !scripts/audit-repository-assets.js
 !scripts/assert-no-retired-telegram-sidecar.js
-
+!scripts/verify-sidecar-binaries.js
+!scripts/fetch-sidecar-binaries.js
+# Cultivator merit theme asset pipeline (active)
+!scripts/generate-cultivator-assets.js
+!scripts/generate-cultivator-ai-assets.js
+!scripts/embed-cultivator-ai-svgs.js
+!scripts/split-cultivator-spritesheet.js
+!scripts/make-cultivator-pngs-transparent.js
+!scripts/build-cultivator-stage-preview.js
+# Cultivator pipeline — DEPRECATED repair scripts (kept for archaeology; do not use)
+!scripts/lock-cultivator-working-to-idle.js
+!scripts/composite-cultivator-knock-on-idle.js
 # oh-my-cursor state
 .omc/
-
 # Cursor local config (MCP, rules from omc setup)
 .cursor/
+.tools/
+.tools-ffmpeg
+
+# HyperFrames local outputs
+videos/**/snapshots/
+videos/**/output.mp4
+videos/**/.hyperframes/

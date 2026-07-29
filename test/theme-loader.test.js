@@ -892,7 +892,13 @@ describe("theme-loader capability metadata", () => {
       powerProfile: "standard",
       petTint: false,
       accessories: false,
+      meritCultivator: {
+        enabled: false,
+        params: theme._capabilities.meritCultivator.params,
+        stages: null,
+      },
     });
+    assert.strictEqual(theme._capabilities.meritCultivator.enabled, false);
   });
 
   it("includes capabilities in theme metadata scans", () => {
@@ -909,6 +915,11 @@ describe("theme-loader capability metadata", () => {
       powerProfile: "standard",
       petTint: false,
       accessories: false,
+      meritCultivator: {
+        enabled: false,
+        params: meta.capabilities.meritCultivator.params,
+        stages: null,
+      },
     });
 
     const listed = themeLoader.listThemesWithMetadata().find((theme) => theme.id === "capTheme");

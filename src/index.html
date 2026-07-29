@@ -24,6 +24,31 @@
       <div id="pet-effect-stage">
         <div id="pet-particle-layer"></div>
       </div>
+      <div id="merit-overlay" class="merit-overlay" hidden aria-hidden="true">
+        <div class="merit-overlay-frame">
+          <div class="merit-overlay-row">
+            <span class="merit-stage-chip">
+              <span class="merit-stage-ornament" aria-hidden="true"></span>
+              <span id="merit-stage-name" class="merit-stage-name"></span>
+            </span>
+            <span class="merit-value-wrap">
+              <span class="merit-gem" aria-hidden="true"></span>
+              <span id="merit-value" class="merit-value"></span>
+              <span id="merit-value-cap" class="merit-value-cap" hidden></span>
+            </span>
+          </div>
+          <div class="merit-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="merit-bar-track">
+              <div id="merit-bar-fill" class="merit-bar-fill">
+                <span class="merit-bar-shine" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="merit-award-pop" class="merit-award-pop" aria-hidden="true"></div>
+        <div id="merit-live" class="merit-live" aria-live="polite"></div>
+      </div>
+      <div id="merit-level-toast" class="merit-level-toast" hidden aria-hidden="true"></div>
     </div>
   </div>
   <script src="pet-accessory-layout.js"></script>

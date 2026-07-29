@@ -71,6 +71,11 @@ Copilot CLI 同步走 `<COPILOT_HOME 或 ~/.copilot>/hooks/hooks.json`，marker-
 - `docs/project/agent-runtime-architecture.md`：集成方式、数据流、多 agent、permission bubble、opencode、终端聚焦、自动同步
 - `docs/project/project-architecture.md`：更完整的模块边界和启动/运行时分层
 - `docs/project/theme-state-ui.md`：状态机、主题系统、settings、mini mode、素材规则、平台限制、待落地 UI 决策
+- `docs/guides/cultivator-asset-standard.md`：功德桌宠素材**标准/规范**（确定的画布/尺寸/比例/命名/验收阈值 + 对外开放基线）——新增形象或动作前先看这里取硬性参数
+- `docs/guides/cultivator-asset-pipeline.md`：功德桌宠 AI 素材生图约束、流水线与排障（重生优于改图）
+- `docs/guides/cultivator-asset-lessons.md`：功德桌宠素材复盘（AI 生图约束、逐帧动画大小一致、FX 分层的经验教训）
+- `docs/project/merit-cultivator-prd.md`：⚠️ **DEPRECATED** 历史产品需求（早期 2 境界 MVP 快照）；境界/素材/验收以 `cultivator-asset-standard.md` 为准
+- `docs/project/cultivator-promo-brief.md`：宣传片 creative brief / 分镜（营销用，非产品规范）
 - `docs/project/release-process.md`：发版 checklist、release note 核对、tag 触发 GitHub 打包和资产确认
 - `docs/guides/copilot-setup.md`：Copilot CLI 自动同步说明、`COPILOT_HOME` 兼容性、手动配置备选模板
 - `docs/guides/state-mapping.md`：状态 → 动画权威表

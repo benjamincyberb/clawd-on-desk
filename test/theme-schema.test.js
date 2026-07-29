@@ -60,6 +60,28 @@ describe("theme schema validation", () => {
     assert.deepStrictEqual(errors, []);
   });
 
+  it("validates stateSounds bindings against sounds and known modes", () => {
+    assert.deepStrictEqual(schema.validateTheme(validThemeJson({
+      sounds: { knock: "knock.wav" },
+      stateSounds: {
+        working: { sound: "knock", mode: "loop" },
+        thinking: { sound: "complete" },
+      },
+    })), []);
+
+    const errors = schema.validateTheme(validThemeJson({
+      sounds: { knock: "knock.wav" },
+      stateSounds: {
+        working: { sound: "missing", mode: "loop" },
+        idle: { sound: "knock", mode: "beat" },
+        bad: "knock",
+      },
+    }));
+    assert.ok(errors.some((error) => error.includes('sound "missing" is not defined')));
+    assert.ok(errors.some((error) => error.includes("mode must be one of loop")));
+    assert.ok(errors.some((error) => error.includes("stateSounds.bad must be an object")));
+  });
+
   it("rejects invalid fallback chains and mini themes missing required mini states", () => {
     const errors = schema.validateTheme(validThemeJson({
       states: {
@@ -370,6 +392,7 @@ describe("theme schema defaults and normalization", () => {
     assert.deepStrictEqual(theme.states.thinking, ["thinking.svg"]);
     assert.deepStrictEqual(theme._stateBindings.sleeping, { files: ["sleeping.svg"], fallbackTo: null });
     assert.strictEqual(theme.sounds.complete, "complete.wav");
+    assert.deepStrictEqual(theme.stateSounds, {});
     assert.strictEqual(theme.reactions.drag.file, "drag.svg");
     assert.strictEqual(theme.reactions.drag.fileLeft, "drag-left.svg");
     assert.strictEqual(theme.reactions.drag.fileRight, "drag-right.svg");
@@ -378,6 +401,24 @@ describe("theme schema defaults and normalization", () => {
     assert.strictEqual(theme.idleAnimations[0].file, "look.svg");
     assert.deepStrictEqual(theme.displayHintMap, { "../old.svg": "new.svg" });
     assert.deepStrictEqual(theme.updateVisuals, { checking: "checking.svg" });
+  });
+
+  it("mergeDefaults keeps stateSounds sound names and defaults mode to loop", () => {
+    const theme = schema.mergeDefaults(validThemeJson({
+      sounds: { knock: "../nested/knock.wav" },
+      stateSounds: {
+        working: { sound: "knock" },
+        thinking: { sound: "knock", mode: "loop" },
+        badMode: { sound: "knock", mode: "beat" },
+        missingSound: { mode: "loop" },
+      },
+    }), "demo", true);
+
+    assert.strictEqual(theme.sounds.knock, "knock.wav");
+    assert.deepStrictEqual(theme.stateSounds, {
+      working: { sound: "knock", mode: "loop" },
+      thinking: { sound: "knock", mode: "loop" },
+    });
   });
 
   it("normalizes file hitboxes, rendering, and trusted runtime without file system state", () => {

@@ -137,6 +137,7 @@ const createTopmostRuntime = require("./topmost-runtime");
 const { WIN_TOPMOST_LEVEL } = createTopmostRuntime;
 const createThemeFadeSequencer = require("./theme-fade-sequencer");
 const createThemeRuntime = require("./theme-runtime");
+const { createMeritBridge } = require("./merit-bridge");
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
@@ -373,6 +374,7 @@ let telegramApprovalIdentitySignature = "";
 let _telegramMigrationController = null;
 let telegramNativeRunner = null;
 let telegramCompanion = null;
+let meritBridge = null;
 let telegramDirectSend = null;
 let discordPresenceBridge = null;
 let suppressTelegramMigrationReconcile = 0;
@@ -455,7 +457,21 @@ const _settingsController = createSettingsController({
     },
     // Theme runtime is wired after theme-loader.init(); keep these closures
     // lazy so settings actions never capture a pre-init runtime reference.
-    activateTheme: (id, variantId, overrideMap) => themeRuntime.activateTheme(id, variantId, overrideMap),
+    activateTheme: (id, variantId, overrideMap, options) => (
+      meritBridge
+        ? meritBridge.activateTheme(id, variantId, overrideMap, options)
+        : themeRuntime.activateTheme(id, variantId, overrideMap, options)
+    ),
+    resetMeritProgress: (payload) => (
+      meritBridge
+        ? meritBridge.resetMeritProgress(payload)
+        : { status: "error", message: "merit bridge unavailable" }
+    ),
+    previewMeritStage: (payload) => (
+      meritBridge
+        ? meritBridge.previewMeritStage(payload)
+        : { status: "error", message: "merit bridge unavailable" }
+    ),
     refreshActiveThemeHitboxOverrides: (id, overrideMap) =>
       themeRuntime.refreshActiveThemeHitboxOverrides(id, overrideMap),
     getThemeInfo: (id) => themeRuntime.getThemeInfo(id),
@@ -671,6 +687,23 @@ function getActiveTheme() {
   return themeRuntime ? themeRuntime.getActiveTheme() : null;
 }
 
+let meritSuspended = false;
+// Declared before any merit bridge path that may read DND synchronously.
+let doNotDisturb = false;
+const meritStageBridge = { setMeritStage: null };
+meritBridge = createMeritBridge({
+  settingsController: _settingsController,
+  getActiveTheme,
+  activateThemeRuntime: (...args) => themeRuntime.activateTheme(...args),
+  getThemeMetadata: (id) => themeLoader.getThemeMetadata(id),
+  getLang: () => _settingsController.get("lang") || lang || "en",
+  getDoNotDisturb: () => doNotDisturb,
+  sendToRenderer: (...args) => sendToRenderer(...args),
+  playSound: (name) => playSound(name),
+  isSuspended: () => meritSuspended,
+  setMeritStage: (stageId) => meritStageBridge.setMeritStage?.(stageId),
+});
+
 let animationOverridesMain = null;
 function bumpAnimationOverridePreviewPosterGeneration() {
   return animationOverridesMain && animationOverridesMain.bumpPreviewPosterGeneration();
@@ -778,6 +811,18 @@ if (codexPetMain.summaryHasActiveOrphan(_startupCodexPetSyncSummary, _requestedT
 const _loadedStartupTheme = themeRuntime.loadInitialTheme(_requestedThemeId, {
   variant: _requestedVariantId,
   overrides: _requestedThemeOverrides,
+  progressionStageId: (() => {
+    try {
+      const meta = themeLoader.getThemeMetadata(_requestedThemeId);
+      const cap = meta && meta.capabilities && meta.capabilities.meritCultivator;
+      if (!cap || !cap.enabled || !Array.isArray(cap.stages)) return undefined;
+      const { resolveProgressionStageFromBucket } = require("./theme-progression");
+      const bucket = (_settingsController.get("meritProgress") || {})[_requestedThemeId] || {};
+      return resolveProgressionStageFromBucket(bucket, cap.stages) || undefined;
+    } catch {
+      return undefined;
+    }
+  })(),
 });
 if (_loadedStartupTheme._id !== _requestedThemeId || _loadedStartupTheme._variantId !== _requestedVariantId) {
   const nextVariantMap = { ...(_settingsController.get("themeVariant") || {}) };
@@ -836,6 +881,7 @@ const petWindowRuntime = createPetWindowRuntime({
   buildTrayMenu: () => buildTrayMenu(),
   buildContextMenu: () => buildContextMenu(),
   reapplyMacVisibility: () => reapplyMacVisibility(),
+  onPetHiddenChanged: () => { try { syncLoopSoundGate(); } catch {} },
   reassertWinTopmost: () => reassertWinTopmost(),
   scheduleHwndRecovery: () => scheduleHwndRecovery(),
   cloakInspector: _cloakInspector,
@@ -952,7 +998,6 @@ function getEffectiveCurrentPixelSize(overrideWa) {
   return getCurrentPixelSize(overrideWa);
 }
 let contextMenu;
-let doNotDisturb = false;
 let isQuitting = false;
 // Mirror caches: kept in sync with the settings store via settings-effect-router
 // further down. Read freely; never assign
@@ -1135,12 +1180,37 @@ function getThemeSoundPreloadUrls() {
     const url = themeRuntime.getSoundUrl(name);
     if (url && !urls.includes(url)) urls.push(url);
   }
+  const stateSounds = themeRuntime.getStateSoundUrls
+    ? themeRuntime.getStateSoundUrls()
+    : {};
+  for (const entry of Object.values(stateSounds || {})) {
+    if (entry && entry.url && !urls.includes(entry.url)) urls.push(entry.url);
+  }
   return urls;
+}
+
+function syncLoopSoundConfig() {
+  const byState = themeRuntime.getStateSoundUrls
+    ? themeRuntime.getStateSoundUrls()
+    : {};
+  sendToRenderer("loop-sound-config", { byState: byState || {} });
+}
+
+function syncLoopSoundGate() {
+  const enabled = !soundMuted
+    && !doNotDisturb
+    && !petWindowRuntime.isPetHidden();
+  const volume = typeof soundVolume === "number"
+    ? Math.max(0, Math.min(1, soundVolume))
+    : 1;
+  sendToRenderer("loop-sound-state", { enabled, volume });
 }
 
 function syncSoundPreloads() {
   const urls = getThemeSoundPreloadUrls();
   if (urls.length) sendToRenderer("preload-sounds", { urls });
+  syncLoopSoundConfig();
+  syncLoopSoundGate();
 }
 
 function setViewportOffsetY(offsetY) { return petWindowRuntime.setViewportOffsetY(offsetY); }
@@ -1165,6 +1235,11 @@ function syncRendererStateAfterLoad({ includeStartupRecovery = true } = {}) {
   const accessoryId = getPetAccessoryIdForTheme(petAccessory, activeTheme && activeTheme._id);
   sendToRenderer("pet-accessory-change", resolvePetAccessoryPayload(accessoryId, activeTheme));
   sendToRenderer("low-power-idle-mode-change", lowPowerIdleMode);
+  if (meritBridge) {
+    try {
+      meritBridge.syncToActiveTheme();
+    } catch {}
+  }
   if (_mini.getMiniMode()) {
     sendToRenderer("mini-mode-change", true, _mini.getMiniEdge());
     // mini-clip is a renderer inline style — a renderer/theme reload (and
@@ -1665,7 +1740,13 @@ const _stateCtx = {
   accountQuotaPersistPath: require("./state-account-quota").DEFAULT_PERSIST_PATH,
   get quotaMergeSources() { return quotaMergeSources; },
   get doNotDisturb() { return doNotDisturb; },
-  set doNotDisturb(v) { doNotDisturb = v; },
+  set doNotDisturb(v) {
+    doNotDisturb = v;
+    if (meritBridge) {
+      try { meritBridge.setDnd(v); } catch {}
+    }
+    syncLoopSoundGate();
+  },
   get miniMode() { return _mini.getMiniMode(); },
   get miniTransitioning() { return _mini.getMiniTransitioning(); },
   get mouseOverPet() { return mouseOverPet; },
@@ -1721,6 +1802,9 @@ const _stateCtx = {
     if (discordPresenceBridge) {
       try { discordPresenceBridge.onSnapshot(snapshot); } catch {}
     }
+    if (meritBridge) {
+      try { meritBridge.onSnapshot(snapshot); } catch {}
+    }
     if (_lanWss) { try { _lanWss.onSnapshot(); } catch {} }
   },
   // Phase 3b: 读 prefs.themeOverrides 判断某个 oneshot state 是否被用户禁用。
@@ -1769,6 +1853,14 @@ const _stateCtx = {
   },
 };
 const _state = require("./state")(_stateCtx);
+meritStageBridge.setMeritStage = _state.setMeritStage;
+// Start merit after `let win` / stage bridge wiring — ensureEngine broadcasts
+// via sendToRenderer and applies stage visuals through setMeritStage.
+if (meritBridge) {
+  try { meritBridge.ensureEngine(); } catch (err) {
+    console.warn("Clawd: merit engine startup failed:", err && err.message);
+  }
+}
 const { setState, applyState, updateSession, resolveDisplayState, getSvgOverride,
         enableDoNotDisturb, disableDoNotDisturb, startStaleCleanup, stopStaleCleanup,
         startWakePoll, stopWakePoll, detectRunningAgentProcesses,
@@ -3406,7 +3498,9 @@ const SETTINGS_MIRROR_SETTERS = {
   sessionHudPinned: (v) => { sessionHudPinned = v; },
   sessionStaleMs: (v) => { sessionStaleMs = v; }, workingStaleMs: (v) => { workingStaleMs = v; },
   detachedIdleStaleMs: (v) => { detachedIdleStaleMs = v; },
-  soundMuted: (v) => { soundMuted = v; }, soundVolume: (v) => { soundVolume = v; }, lowPowerIdleMode: (v) => { lowPowerIdleMode = v; },
+  soundMuted: (v) => { soundMuted = v; syncLoopSoundGate(); },
+  soundVolume: (v) => { soundVolume = v; syncLoopSoundGate(); },
+  lowPowerIdleMode: (v) => { lowPowerIdleMode = v; },
   keepAwakeWhileWorking: (v) => { keepAwakeWhileWorking = v; },
   petTint: (v) => { petTint = v; },
   petAccessory: (v) => { petAccessory = v; },
@@ -3478,6 +3572,12 @@ const settingsEffectRouter = createSettingsEffectRouter({
   },
   rebuildAllMenus,
   reconcilePowerSaveBlocker,
+  broadcastMeritStatus: () => {
+    if (meritBridge) meritBridge.broadcastStatus();
+  },
+  syncMeritTheme: () => {
+    if (meritBridge) meritBridge.syncToActiveTheme();
+  },
   logWarn: console.warn,
 });
 settingsEffectRouter.start();
@@ -3704,6 +3804,7 @@ registerSettingsIpc({
   getDoNotDisturb: () => doNotDisturb,
   getSoundMuted: () => soundMuted,
   getSoundVolume: () => soundVolume,
+  getMeritStatus: () => (meritBridge ? meritBridge.getStatus() : { enabled: false }),
   getAllAgents,
   getHookServerPort: () => getHookServerPort(),
   getRecentHookEvents: (options) => _server.getRecentHookEvents(options),
@@ -4031,7 +4132,13 @@ const _miniCtx = {
   get win() { return win; },
   get currentSize() { return currentSize; },
   get doNotDisturb() { return doNotDisturb; },
-  set doNotDisturb(v) { doNotDisturb = v; },
+  set doNotDisturb(v) {
+    doNotDisturb = v;
+    if (meritBridge) {
+      try { meritBridge.setDnd(v); } catch {}
+    }
+    syncLoopSoundGate();
+  },
   get currentState() { return _state.getCurrentState(); },
   notifyUpdaterSilentExit: () => notifyUpdaterSilentExit(),
   SIZES,
@@ -4338,6 +4445,20 @@ if (!gotTheLock) {
       powerMonitor.on("resume", () => petWindowRuntime.recoverIfCloaked());
       powerMonitor.on("unlock-screen", () => petWindowRuntime.recoverIfCloaked());
     }
+    if (powerMonitor && typeof powerMonitor.on === "function") {
+      powerMonitor.on("suspend", () => {
+        meritSuspended = true;
+        if (meritBridge) {
+          try { meritBridge.setSuspended(true); } catch {}
+        }
+      });
+      powerMonitor.on("resume", () => {
+        meritSuspended = false;
+        if (meritBridge) {
+          try { meritBridge.setSuspended(false); } catch {}
+        }
+      });
+    }
     // macOS: bridge the OS app-hidden state (⌘H / Dock right-click → 隐藏) to the
     // pet. Pet windows are setCanHide:NO, so the OS marks the app hidden but the
     // windows refuse to vanish, and an inactive-app Dock Hide fires no
@@ -4408,6 +4529,9 @@ if (!gotTheLock) {
     _cloakInspector.dispose();
     try { stopUpdateScheduler(); } catch {}
     releasePowerSaveBlocker();
+    if (meritBridge) {
+      try { meritBridge.cleanup(); } catch {}
+    }
     flushRuntimeStateToPrefs();
     globalShortcut.unregisterAll();
     void settingsSizePreviewSession.cleanup();

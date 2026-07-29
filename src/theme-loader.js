@@ -41,6 +41,12 @@ const {
   buildBaseBindingMetadata: _buildBaseBindingMetadata,
   applyUserOverridesPatch: _applyUserOverridesPatch,
 } = require("./theme-variants");
+const {
+  normalizeMeritCultivator,
+  applyProgressionVisuals,
+  resolveStage,
+  buildMeritStageProfiles,
+} = require("./theme-progression");
 
 // ── State ──
 
@@ -179,17 +185,37 @@ function loadTheme(themeId, opts = {}) {
   // basename sanitization all run on the patched raw.
   const { resolvedId, spec: variantSpec } = _resolveVariant(raw, requestedVariant);
   const afterVariant = variantSpec ? _applyVariantPatch(raw, variantSpec, themeId, resolvedId) : raw;
-  const patchedRaw = userOverrides ? _applyUserOverridesPatch(afterVariant, userOverrides) : afterVariant;
+
+  // Progression visuals (builtin merit cultivator stages) apply after the
+  // user-selected aesthetic variant and before per-slot animation overrides.
+  const meritCap = normalizeMeritCultivator(raw, { isBuiltin });
+  let progressionStageId = null;
+  let afterProgression = afterVariant;
+  if (meritCap.enabled && Array.isArray(meritCap.stages)) {
+    const requestedStage = typeof opts.progressionStageId === "string" && opts.progressionStageId
+      ? opts.progressionStageId
+      : meritCap.stages[0].id;
+    const stage = meritCap.stages.find((entry) => entry.id === requestedStage)
+      || resolveStage(0, meritCap.stages)
+      || meritCap.stages[0];
+    progressionStageId = stage.id;
+    afterProgression = applyProgressionVisuals(afterVariant, stage);
+  }
+
+  const patchedRaw = userOverrides
+    ? _applyUserOverridesPatch(afterProgression, userOverrides)
+    : afterProgression;
 
   // Merge defaults for optional fields
   const theme = mergeDefaults(patchedRaw, themeId, isBuiltin);
   theme._themeDir = themeDir;
   theme._variantId = resolvedId;
+  theme._progressionStageId = progressionStageId;
   theme._userOverrides = userOverrides;
-  theme._bindingBase = _buildBaseBindingMetadata(afterVariant);
+  theme._bindingBase = _buildBaseBindingMetadata(afterProgression);
   theme._baseTransitions = {};
-  if (afterVariant.transitions && typeof afterVariant.transitions === "object") {
-    for (const [file, transition] of Object.entries(afterVariant.transitions)) {
+  if (afterProgression.transitions && typeof afterProgression.transitions === "object") {
+    for (const [file, transition] of Object.entries(afterProgression.transitions)) {
       const name = _basenameOnly(file);
       if (!name || !transition || typeof transition !== "object") continue;
       const clean = {};
@@ -198,10 +224,26 @@ function loadTheme(themeId, opts = {}) {
       if (Object.keys(clean).length > 0) theme._baseTransitions[name] = clean;
     }
   }
-  theme._baseWideHitboxFiles = Array.isArray(afterVariant.wideHitboxFiles)
-    ? [...new Set(afterVariant.wideHitboxFiles.map((file) => _basenameOnly(file)).filter(Boolean))]
+  theme._baseWideHitboxFiles = Array.isArray(afterProgression.wideHitboxFiles)
+    ? [...new Set(afterProgression.wideHitboxFiles.map((file) => _basenameOnly(file)).filter(Boolean))]
     : [];
-  theme._capabilities = _buildCapabilities(theme, { trustedRuntimeAllowed: !!theme._builtin });
+  theme._capabilities = _buildCapabilities(theme, {
+    trustedRuntimeAllowed: !!theme._builtin,
+    isBuiltin: !!theme._builtin,
+  });
+  // Always expose the normalized merit capability from the raw theme declaration
+  // (enabled only for builtin), even when progression visuals were applied.
+  theme._capabilities.meritCultivator = meritCap;
+  if (meritCap.enabled && Array.isArray(meritCap.stages)) {
+    theme._meritStageProfiles = buildMeritStageProfiles(
+      afterVariant,
+      meritCap.stages,
+      userOverrides,
+      themeId,
+      isBuiltin
+    );
+    theme._meritStageId = progressionStageId;
+  }
 
   // For external themes: sanitize SVGs + resolve asset paths
   if (!isBuiltin) {
@@ -440,6 +482,11 @@ function getPreviewSoundUrl() {
   return getSoundUrl("confirm") || getSoundUrl("complete") || null;
 }
 
+function getStateSoundUrls() {
+  const context = _getActiveThemeContext();
+  return context ? context.getStateSoundUrls() : {};
+}
+
 /**
  * Read metadata for a single theme WITHOUT activating it.
  * Returns null for missing/malformed themes.
@@ -479,6 +526,7 @@ module.exports = {
   ensureUserThemesDir,
   getSoundUrl,
   getPreviewSoundUrl,
+  getStateSoundUrls,
   getSoundOverridesDir,
   createThemeContext: _createThemeContext,
   _resolveAssetPath,

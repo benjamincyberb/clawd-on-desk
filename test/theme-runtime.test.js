@@ -216,7 +216,7 @@ describe("theme-runtime active ownership", () => {
 
     const result = runtime.activateTheme("clawd");
 
-    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default" });
+    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default", progressionStageId: null });
     assert.deepStrictEqual(calls, []);
   });
 
@@ -227,7 +227,7 @@ describe("theme-runtime active ownership", () => {
 
     const result = runtime.reloadActiveTheme();
 
-    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default" });
+    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default", progressionStageId: null });
     assert.ok(calls.includes("state.cleanup"));
     assert.ok(calls.includes("state.refreshTheme"));
     assert.ok(calls.includes("syncRendererState"));
@@ -241,7 +241,7 @@ describe("theme-runtime active ownership", () => {
 
     const result = runtime.activateTheme("clawd", "missing");
 
-    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default" });
+    assert.deepStrictEqual(result, { themeId: "clawd", variantId: "default", progressionStageId: null });
     assert.strictEqual(runtime.getActiveTheme()._variantId, "default");
   });
 
@@ -252,7 +252,7 @@ describe("theme-runtime active ownership", () => {
 
     const result = runtime.activateTheme("calico");
 
-    assert.deepStrictEqual(result, { themeId: "calico", variantId: "default" });
+    assert.deepStrictEqual(result, { themeId: "calico", variantId: "default", progressionStageId: null });
     assert.strictEqual(runtime.getActiveTheme()._id, "calico");
     assert.deepStrictEqual(calls, [
       "bumpPoster",
@@ -294,6 +294,23 @@ describe("theme-runtime active ownership", () => {
       "syncHitWin",
       "flushPrefs",
     ]);
+  });
+
+  it("includes progressionStageId in activate dedup for merit-capable themes only", () => {
+    makeFixture();
+    const { runtime, calls } = createRuntime();
+    runtime.loadInitialTheme("clawd");
+
+    // Non-merit themes ignore requested progressionStageId for dedup.
+    const ignored = runtime.activateTheme("clawd", "default", null, {
+      progressionStageId: "mortal",
+    });
+    assert.deepStrictEqual(ignored, {
+      themeId: "clawd",
+      variantId: "default",
+      progressionStageId: null,
+    });
+    assert.deepStrictEqual(calls, []);
   });
 
   it("applies clamped preserved bounds after theme reload when the clamp path adjusts them", () => {

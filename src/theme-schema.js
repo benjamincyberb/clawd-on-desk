@@ -7,6 +7,11 @@ const DEFAULT_SOUNDS = {
   confirm: "confirm.mp3",
 };
 
+// State-scoped looping / cadence sounds. Themes map a display state to a
+// logical sound name from `sounds`. Only "loop" is implemented today; other
+// modes may be added without changing callers that already pass mode through.
+const STATE_SOUND_MODES = new Set(["loop"]);
+
 const DEFAULT_TIMINGS = {
   minDisplay: {
     attention: 4000, error: 5000, sweeping: 5500,
@@ -199,6 +204,37 @@ function validateTheme(cfg) {
 
   if (cfg.roamFlipAssets !== undefined && typeof cfg.roamFlipAssets !== "boolean") {
     errors.push(`roamFlipAssets must be a boolean, got ${JSON.stringify(cfg.roamFlipAssets)}`);
+  }
+
+  if (cfg.stateSounds !== undefined) {
+    if (!isPlainObject(cfg.stateSounds)) {
+      errors.push("stateSounds must be an object when present");
+    } else {
+      const knownSounds = {
+        ...DEFAULT_SOUNDS,
+        ...(isPlainObject(cfg.sounds) ? cfg.sounds : {}),
+      };
+      for (const [stateKey, entry] of Object.entries(cfg.stateSounds)) {
+        if (!stateKey) {
+          errors.push("stateSounds keys must be non-empty state names");
+          continue;
+        }
+        if (!isPlainObject(entry)) {
+          errors.push(`stateSounds.${stateKey} must be an object`);
+          continue;
+        }
+        if (typeof entry.sound !== "string" || !entry.sound) {
+          errors.push(`stateSounds.${stateKey}.sound must be a non-empty string`);
+        } else if (!Object.prototype.hasOwnProperty.call(knownSounds, entry.sound)
+          || knownSounds[entry.sound] == null) {
+          errors.push(`stateSounds.${stateKey}.sound "${entry.sound}" is not defined in sounds`);
+        }
+        const mode = entry.mode === undefined ? "loop" : entry.mode;
+        if (!STATE_SOUND_MODES.has(mode)) {
+          errors.push(`stateSounds.${stateKey}.mode must be one of ${[...STATE_SOUND_MODES].join("|")}, got ${JSON.stringify(entry.mode)}`);
+        }
+      }
+    }
   }
 
   const fallbackStateKeys = Object.keys(normalizedStates);
@@ -765,6 +801,12 @@ function deriveAccessoryCapability(cfg) {
 }
 
 function buildCapabilities(cfg, options = {}) {
+  const {
+    normalizeMeritCultivator,
+  } = require("./theme-progression");
+  const meritCultivator = normalizeMeritCultivator(cfg, {
+    isBuiltin: !!options.trustedRuntimeAllowed || !!options.isBuiltin,
+  });
   return {
     eyeTracking: !!(
       isPlainObject(cfg && cfg.eyeTracking)
@@ -784,6 +826,7 @@ function buildCapabilities(cfg, options = {}) {
       && cfg.customization.petTint === true
     ),
     accessories: deriveAccessoryCapability(cfg),
+    meritCultivator,
   };
 }
 
@@ -796,6 +839,12 @@ function collectRequiredAssetFiles(theme) {
   const files = new Set();
   for (const usage of projectThemeVisualUsages(theme)) {
     addThemeAssetFile(files, usage.file);
+  }
+  if (isPlainObject(theme && theme.meritCultivator) && Array.isArray(theme.meritCultivator.stages)) {
+    const { collectProgressionAssetFiles } = require("./theme-progression");
+    for (const file of collectProgressionAssetFiles(theme.meritCultivator.stages)) {
+      addThemeAssetFile(files, file);
+    }
   }
   return [...files];
 }
@@ -1065,6 +1114,18 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   // sounds
   theme.sounds = { ...DEFAULT_SOUNDS, ...(raw.sounds || {}) };
 
+  // stateSounds — optional per-state loop/cadence bindings (sound names only)
+  theme.stateSounds = {};
+  if (isPlainObject(raw.stateSounds)) {
+    for (const [stateKey, entry] of Object.entries(raw.stateSounds)) {
+      if (!stateKey || !isPlainObject(entry)) continue;
+      if (typeof entry.sound !== "string" || !entry.sound) continue;
+      const mode = entry.mode === undefined ? "loop" : entry.mode;
+      if (!STATE_SOUND_MODES.has(mode)) continue;
+      theme.stateSounds[stateKey] = { sound: entry.sound, mode };
+    }
+  }
+
   // reactions
   theme.reactions = raw.reactions || null;
 
@@ -1112,8 +1173,11 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     }
   }
   if (theme.sounds) {
-    for (const [k, v] of Object.entries(theme.sounds)) theme.sounds[k] = bn(v);
+    for (const [k, v] of Object.entries(theme.sounds)) {
+      theme.sounds[k] = v == null ? null : bn(v);
+    }
   }
+  // stateSounds references logical sound names (not filenames) — no basename.
   if (theme.displayHintMap) {
     for (const [k, v] of Object.entries(theme.displayHintMap)) theme.displayHintMap[k] = bn(v);
   }
@@ -1148,6 +1212,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
 
 module.exports = {
   DEFAULT_SOUNDS,
+  STATE_SOUND_MODES,
   DEFAULT_TIMINGS,
   DEFAULT_HITBOXES,
   DEFAULT_OBJECT_SCALE,
