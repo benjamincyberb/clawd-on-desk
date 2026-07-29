@@ -181,6 +181,33 @@ function workingFrameKeyframes(frameIndex) {
   return lines.join("\n");
 }
 
+/**
+ * SMIL opacity cuts for knock frames. CSS @keyframes only run on the <object>
+ * channel (and need style-src unsafe-inline); SMIL also animates inside <img>,
+ * so the knock loop survives img-channel fallback / strict CSP.
+ */
+function workingFrameSmil(frameIndex) {
+  const count = WORKING_FRAME_COUNT;
+  const start = (frameIndex - 1) / count;
+  const end = frameIndex / count;
+  let keyTimes;
+  let values;
+  if (frameIndex === 1) {
+    keyTimes = `0;${end};${end + 0.000001};1`;
+    values = "1;1;0;0";
+  } else if (frameIndex === count) {
+    keyTimes = `0;${start};${start + 0.000001};1`;
+    values = "0;0;1;1";
+  } else {
+    keyTimes = `0;${start};${start + 0.000001};${end};${end + 0.000001};1`;
+    values = "0;0;1;1;0;0";
+  }
+  return (
+    `<animate attributeName="opacity" dur="${WORKING_PERIOD}" repeatCount="indefinite" ` +
+    `calcMode="linear" keyTimes="${keyTimes}" values="${values}"/>`
+  );
+}
+
 /** @deprecated Layered knock only — unused by embedAll. */
 function layeredKnockStyle(layout) {
   const raise = Number(layout.raiseDeg) || -50;
@@ -487,7 +514,14 @@ function wrapWorkingFramesInSvg(stageId, frameBuffers, viewBox) {
   const frames = frameBuffers
     .map((buf, index) => {
       const frameNum = index + 1;
-      return `<g id="knock-frame-${frameNum}" opacity="${frameNum === 1 ? 1 : 0}">${rasterImageTag(buf, viewBox)}</g>`;
+      // Start all frames at opacity 0 and let SMIL (+ CSS on object channel)
+      // drive visibility — avoids a stuck first-frame still if CSS is blocked.
+      return (
+        `<g id="knock-frame-${frameNum}" opacity="0">` +
+        workingFrameSmil(frameNum) +
+        rasterImageTag(buf, viewBox) +
+        `</g>`
+      );
     })
     .join("\n");
 

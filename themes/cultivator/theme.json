@@ -41,6 +41,9 @@
     },
     "shadowOrigin": "8px 19px"
   },
+  "rendering": {
+    "svgChannel": "object"
+  },
   "sleepSequence": {
     "mode": "direct"
   },
@@ -66,7 +69,7 @@
       "mortal-idle.svg"
     ],
     "thinking": [
-      "mortal-thinking.svg"
+      "mortal-working.svg"
     ],
     "working": [
       "mortal-working.svg"
@@ -162,7 +165,7 @@
               "adept-idle.svg"
             ],
             "thinking": [
-              "adept-thinking.svg"
+              "adept-working.svg"
             ],
             "working": [
               "adept-working.svg"
@@ -207,7 +210,7 @@
               "novice-idle.svg"
             ],
             "thinking": [
-              "novice-thinking.svg"
+              "novice-working.svg"
             ],
             "working": [
               "novice-working.svg"
@@ -252,7 +255,7 @@
               "arhat-idle.svg"
             ],
             "thinking": [
-              "arhat-thinking.svg"
+              "arhat-working.svg"
             ],
             "working": [
               "arhat-working.svg"
@@ -297,7 +300,7 @@
               "bodhisattva-idle.svg"
             ],
             "thinking": [
-              "bodhisattva-thinking.svg"
+              "bodhisattva-working.svg"
             ],
             "working": [
               "bodhisattva-working.svg"
@@ -342,7 +345,7 @@
               "buddha-idle.svg"
             ],
             "thinking": [
-              "buddha-thinking.svg"
+              "buddha-working.svg"
             ],
             "working": [
               "buddha-working.svg"

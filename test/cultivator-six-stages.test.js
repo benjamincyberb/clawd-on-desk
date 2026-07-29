@@ -52,6 +52,16 @@ describe("cultivator six-stage progression", () => {
     assert.deepEqual(stages.map((s) => s.requiredMerit), [0, 5, 50, 150, 300, 500]);
   });
 
+  it("forces object SVG channel so CSS knock/halo animations play", () => {
+    // eyeTracking is off; without object channel Chromium freezes CSS @keyframes in <img>.
+    assert.equal(raw.eyeTracking && raw.eyeTracking.enabled, false);
+    assert.equal(raw.rendering && raw.rendering.svgChannel, "object");
+    themeLoader.init(path.join(REPO_ROOT, "src"), path.join(REPO_ROOT, ".tmp-userdata"));
+    themeLoader.bindActiveThemeRuntime(null);
+    const theme = themeLoader.loadTheme("cultivator", { progressionStageId: "arhat" });
+    assert.equal(theme.rendering.svgChannel, "object");
+  });
+
   it("resolves merit thresholds including 388 bodhisattva and 500 buddha", () => {
     for (const { merit, id } of TEST_THRESHOLDS) {
       assert.equal(resolveStage(merit, stages).id, id, `merit ${merit} should be ${id}`);
@@ -111,13 +121,20 @@ describe("cultivator six-stage progression", () => {
       assert.ok(idle.includes("@keyframes"), `${stageId}-idle must include CSS animation`);
       assert.ok(idle.includes("sprite-js"), `${stageId}-idle must animate sprite group`);
       assert.ok(working.includes("data:image/png"), `${stageId}-working should embed AI frame PNGs`);
+      assert.ok(working.includes("@keyframes") || working.includes("<animate"), `${stageId}-working must animate`);
+      assert.ok(!working.includes("woodfish-js"), `${stageId}-working should not use separate woodfish overlay`);
+      assert.ok(!working.includes("torso-knock"), `${stageId}-working should not use continuous torso-knock`);
+      if (stageId === "buddha") {
+        assert.ok(working.includes("no-knock") || working.includes("万佛朝圣"), `${stageId}-working is no-knock`);
+        assert.ok(!working.includes("knock-frame-1"), `${stageId}-working must not use knock frames`);
+        continue;
+      }
       assert.ok(working.includes("knock-frames"), `${stageId}-working must use full AI frame stack`);
       assert.ok(working.includes("knock-frame-1"), `${stageId}-working must include knock-frame-1`);
       assert.ok(working.includes("knock-frame-6"), `${stageId}-working must include knock-frame-6`);
+      assert.ok(working.includes('<animate attributeName="opacity"'), `${stageId}-working must use SMIL frame cuts`);
       assert.ok(working.includes("linear"), `${stageId}-working must use linear discrete frame cuts`);
       assert.ok(!working.includes("step-end"), `${stageId}-working should not use step-end (blank-gap risk)`);
-      assert.ok(!working.includes("woodfish-js"), `${stageId}-working should not use separate woodfish overlay`);
-      assert.ok(!working.includes("torso-knock"), `${stageId}-working should not use continuous torso-knock`);
     }
   });
 
