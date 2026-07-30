@@ -2367,19 +2367,26 @@ let _meritBumpTimer = null;
 let _meritAwardTimer = null;
 let _meritToastTimer = null;
 
+// Temporary: the top merit stage/progress HUD overlaps tall auras (Naruto KCM /
+// Six Paths). Moving or shrinking the sprite clips the figure, so hide the top
+// chrome until a dedicated layout/chrome pass can clear it without tradeoffs.
+const MERIT_TOP_HUD_ENABLED = false;
+
 function syncMeritOverlayVisibility() {
   if (!meritOverlayEl) return;
-  const show = !!(
+  const canShowChrome = !!(
     _meritStatus
     && _meritStatus.enabled
     && _meritOverlayPref
     && !_inMiniMode
     && !_miniPreEntryMode
   );
+  const show = MERIT_TOP_HUD_ENABLED && canShowChrome;
   meritOverlayEl.hidden = !show;
   meritOverlayEl.setAttribute("aria-hidden", show ? "false" : "true");
   if (container) container.classList.toggle("merit-hud-active", show);
-  if (!show && meritLevelToastEl) {
+  // Keep level-up toast available even while the top progress HUD is disabled.
+  if (!canShowChrome && meritLevelToastEl) {
     meritLevelToastEl.hidden = true;
     meritLevelToastEl.classList.remove("show");
     meritLevelToastEl.setAttribute("aria-hidden", "true");

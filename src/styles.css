@@ -98,12 +98,6 @@ html, body {
   filter: none;
 }
 
-/* Merit HUD sits flush at the top — nudge the sprite down so the bar
-   clears the character halo / head instead of covering the subject. */
-#pet-container.merit-hud-active #clawd {
-  top: -8%;
-}
-
 /* ── Roam walk animation ──
    When the pet is roaming (free-roam mode), add a subtle horizontal bob
    to simulate walking even if the theme doesn't have a dedicated roam SVG.
