@@ -2354,8 +2354,7 @@ if (!currentDisplayedSvg && _initialIdleSvg) {
 // --- Merit cultivator overlay (renderer-embedded; no extra BrowserWindow) ---
 const meritOverlayEl = document.getElementById("merit-overlay");
 const meritStageEl = document.getElementById("merit-stage-name");
-const meritValueEl = document.getElementById("merit-value");
-const meritValueCapEl = document.getElementById("merit-value-cap");
+const meritProgressPctEl = document.getElementById("merit-progress-pct");
 const meritBarEl = meritOverlayEl ? meritOverlayEl.querySelector(".merit-bar") : null;
 const meritBarFillEl = document.getElementById("merit-bar-fill");
 const meritAwardPopEl = document.getElementById("merit-award-pop");
@@ -2387,10 +2386,19 @@ function syncMeritOverlayVisibility() {
   }
 }
 
-function formatMeritNumber(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return "0";
-  return String(Math.floor(n));
+function resolveMeritProgressPct(payload) {
+  if (!payload || typeof payload !== "object") return 0;
+  if (Number.isFinite(payload.progressPct)) {
+    return Math.max(0, Math.min(100, payload.progressPct));
+  }
+  if (Number.isFinite(payload.ratio)) {
+    return Math.max(0, Math.min(100, payload.ratio * 100));
+  }
+  return 0;
+}
+
+function formatMeritProgressPct(pct) {
+  return `${Math.round(pct)}%`;
 }
 
 function applyMeritStatus(payload) {
@@ -2409,22 +2417,10 @@ function applyMeritStatus(payload) {
       || payload.stageId
       || "";
   }
-  if (meritValueEl) {
-    meritValueEl.textContent = formatMeritNumber(payload.merit);
+  const pct = resolveMeritProgressPct(payload);
+  if (meritProgressPctEl) {
+    meritProgressPctEl.textContent = formatMeritProgressPct(pct);
   }
-  if (meritValueCapEl) {
-    const nextRequired = Number(payload.nextRequiredMerit);
-    if (Number.isFinite(nextRequired) && nextRequired > 0) {
-      meritValueCapEl.textContent = formatMeritNumber(nextRequired);
-      meritValueCapEl.hidden = false;
-    } else {
-      meritValueCapEl.textContent = "";
-      meritValueCapEl.hidden = true;
-    }
-  }
-  const pct = Number.isFinite(payload.progressPct)
-    ? Math.max(0, Math.min(100, payload.progressPct))
-    : (Number.isFinite(payload.ratio) ? Math.max(0, Math.min(100, payload.ratio * 100)) : 0);
   if (meritBarFillEl) meritBarFillEl.style.width = `${pct}%`;
   if (meritBarEl) {
     meritBarEl.setAttribute("aria-valuenow", String(Math.round(pct)));
@@ -2436,11 +2432,11 @@ function applyMeritStatus(payload) {
 }
 
 function bumpMeritValue() {
-  if (!meritValueEl) return;
-  meritValueEl.classList.add("merit-bump");
+  if (!meritProgressPctEl) return;
+  meritProgressPctEl.classList.add("merit-bump");
   if (_meritBumpTimer) clearTimeout(_meritBumpTimer);
   _meritBumpTimer = setTimeout(() => {
-    meritValueEl.classList.remove("merit-bump");
+    meritProgressPctEl.classList.remove("merit-bump");
   }, 180);
 }
 

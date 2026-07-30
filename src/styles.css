@@ -128,7 +128,7 @@ html, body {
   right: auto;
   top: 1px;
   bottom: auto;
-  width: min(58%, 132px);
+  width: min(78%, 168px);
   z-index: 4;
   pointer-events: none;
   transform: translateX(-50%);
@@ -195,7 +195,7 @@ html, body {
   align-items: center;
   gap: 3px;
   min-width: 0;
-  max-width: 48%;
+  flex: 1 1 auto;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -212,57 +212,32 @@ html, body {
 }
 
 .merit-stage-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 1 auto;
   white-space: nowrap;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: #fff0c4;
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .merit-value-wrap {
   display: inline-flex;
   align-items: baseline;
-  gap: 2px;
-  min-width: 0;
+  justify-content: flex-end;
   flex: 0 0 auto;
+  margin-left: 6px;
 }
 
-.merit-gem {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  align-self: center;
-  border-radius: 1px;
-  background:
-    linear-gradient(135deg, #fff6c8 0%, #f0c84a 42%, #b8860b 100%);
-  box-shadow:
-    0 0 3px rgba(255, 214, 100, 0.75),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  transform: rotate(45deg);
-}
-
-.merit-value {
+.merit-progress-pct {
   font-variant-numeric: tabular-nums;
   color: #ffe08a;
+  font-size: 8px;
+  letter-spacing: 0.02em;
   transition: color 120ms ease, transform 120ms ease, text-shadow 120ms ease;
 }
 
-.merit-value-cap {
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 224, 160, 0.58);
-  font-size: 6px;
-}
-
-.merit-value-cap::before {
-  content: "/";
-  margin-right: 1px;
-  color: rgba(255, 224, 160, 0.35);
-}
-
-.merit-value.merit-bump {
+.merit-progress-pct.merit-bump {
   color: #fff8d6;
-  transform: scale(1.1);
+  transform: scale(1.08);
   text-shadow: 0 0 6px rgba(255, 220, 120, 0.85);
 }
 
@@ -409,7 +384,7 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .merit-value,
+  .merit-progress-pct,
   .merit-bar-fill,
   .merit-award-pop,
   .merit-award-pop.show,
