@@ -16,6 +16,8 @@
 | 去底 | [`scripts/make-cultivator-pngs-transparent.js`](../../scripts/make-cultivator-pngs-transparent.js) |
 | 嵌入 SVG | [`scripts/embed-cultivator-ai-svgs.js`](../../scripts/embed-cultivator-ai-svgs.js) |
 | 浏览器预览（Cursor 看不了 SVG） | [`scripts/build-cultivator-stage-preview.js`](../../scripts/build-cultivator-stage-preview.js) |
+| PetDex 风格 State Viewer（全阶段 × 全动作） | [`scripts/build-cultivator-state-viewer.js`](../../scripts/build-cultivator-state-viewer.js) → `assets/source/cultivator/state-viewer.html` |
+| PetDex 画廊（全部内置桌宠） | [`scripts/build-petdex.js`](../../scripts/build-petdex.js) + [`scripts/preview-petdex.js`](../../scripts/preview-petdex.js) → `/` · `/dex` · `/cultivator` |
 
 废弃补救 / 废弃路径（**不要当主流程**；脚本与分层 API 已标 DEPRECATED）：
 
@@ -235,9 +237,36 @@ node scripts/generate-cultivator-ai-assets.js --prompts
 
 ---
 
-## 验收：preview HTML
+## 验收：State Viewer / preview HTML
 
-Cursor 内置查看器 **不支持 SVG**。拆分后必须用浏览器预览：
+Cursor 内置查看器 **不支持 SVG**。推荐先开全量 State Viewer（PetDex 风格），再按需做单阶段叠图。
+
+### PetDex 画廊（全部内置桌宠）
+
+```bash
+npm run preview:petdex
+# 打开 http://127.0.0.1:8766/        → 全部自建 pet 卡片
+#      http://127.0.0.1:8766/dex     → 同上
+#      http://127.0.0.1:8766/cultivator → Cultivator State Viewer
+```
+
+扫描 `themes/*/theme.json`（跳过 `template`），卡片展示 idle 预览、状态数 / 境界数、素材文件数与作者。Cultivator 卡片点进 State Viewer。
+
+### State Viewer（全阶段 × 全动作）
+
+```bash
+npm run preview:petdex
+# 或单独生成：
+npm run preview:cultivator-states
+# 打开 http://127.0.0.1:8766/cultivator
+```
+
+- 左侧大预览（live SVG；working 会播敲木鱼）
+- 右侧状态网格；**IN USE** = `themes/cultivator/assets/`，**SOURCE** = `generated/`
+- ← → 切换动作，空格换阶段；并排对比 live SVG vs 源 PNG
+- 顶栏可回 PetDex `/`
+
+### 单阶段叠图 preview
 
 ```bash
 node scripts/build-cultivator-stage-preview.js --stage=arhat

@@ -116,6 +116,9 @@ scripts/*
 !scripts/split-cultivator-spritesheet.js
 !scripts/make-cultivator-pngs-transparent.js
 !scripts/build-cultivator-stage-preview.js
+!scripts/build-cultivator-state-viewer.js
+!scripts/build-petdex.js
+!scripts/preview-petdex.js
 # Cultivator pipeline — DEPRECATED repair scripts (kept for archaeology; do not use)
 !scripts/lock-cultivator-working-to-idle.js
 !scripts/composite-cultivator-knock-on-idle.js
