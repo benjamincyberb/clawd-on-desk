@@ -27,6 +27,7 @@
 }
 .frame-3 { animation: naruto-frame-3 1.4s linear infinite; }
 ]]></style>
+
 <ellipse id="shadow-js" cx="8" cy="24.85" rx="4.75" ry="0.76" fill="#000" opacity="0.18"/>
 <g id="body-js">
 <g id="naruto-frame-1" class="working-frame frame-1" visibility="hidden">

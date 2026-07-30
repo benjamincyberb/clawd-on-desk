@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -6 32 32" width="256" height="256">
 <!-- naruto:sage:thinking standalone generated chibi sprite (embed-naruto-chibi-assets.js) -->
+
 <ellipse id="shadow-js" cx="8" cy="24.85" rx="4.75" ry="0.76" fill="#000" opacity="0.18"/>
 <g id="body-js">
   <animateTransform attributeName="transform" type="translate"

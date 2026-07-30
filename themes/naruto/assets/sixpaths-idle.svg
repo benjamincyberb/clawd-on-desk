@@ -1,6 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -6 32 32" width="256" height="256">
 <!-- naruto:sixpaths:idle standalone generated chibi sprite (embed-naruto-chibi-assets.js) -->
+
+<defs>
+  <radialGradient id="sixpaths-bloom" cx="50%" cy="42%" r="55%">
+    <stop offset="0%" stop-color="#FFF6C8" stop-opacity="0.85"/>
+    <stop offset="45%" stop-color="#F5D76E" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#F5D76E" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="sixpaths-blade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#FFF8D0" stop-opacity="0"/>
+    <stop offset="35%" stop-color="#FFE28A" stop-opacity="0.95"/>
+    <stop offset="65%" stop-color="#F5D76E" stop-opacity="0.9"/>
+    <stop offset="100%" stop-color="#FFF8D0" stop-opacity="0"/>
+  </linearGradient>
+</defs>
+<g id="sixpaths-fx" pointer-events="none">
+  <ellipse cx="8" cy="7.4399999999999995" rx="10.2" ry="11.4" fill="url(#sixpaths-bloom)">
+    <animate attributeName="opacity" dur="3.2s" repeatCount="indefinite"
+      calcMode="spline" keyTimes="0;0.5;1" values="0.18;0.34;0.18"
+      keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+  </ellipse>
+  <circle cx="8" cy="7.4399999999999995" r="6.80" fill="none" stroke="#F5D76E"
+    stroke-width="0.14" opacity="0.32">
+    <animate attributeName="opacity" dur="3.6s" repeatCount="indefinite"
+      values="0.2;0.42;0.2"/>
+    <animate attributeName="r" dur="4.8s" repeatCount="indefinite"
+      values="6.60;7.50;6.60"/>
+  </circle>
+  <g transform="translate(8 7.4399999999999995)">
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360"
+        dur="5.5s" repeatCount="indefinite"/>
+      <circle cx="6.40" cy="0.00" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/><circle cx="3.20" cy="3.99" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/><circle cx="-3.20" cy="3.99" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/><circle cx="-6.40" cy="0.00" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/><circle cx="-3.20" cy="-3.99" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/><circle cx="3.20" cy="-3.99" r="0.58" fill="#1A1520" stroke="#F5D76E" stroke-width="0.12"/>
+    </g>
+  </g>
+  <circle cx="16.20" cy="7.44" r="0.26" fill="#FFE9A0" opacity="0">
+  <animate attributeName="opacity" dur="2.8s" begin="0.00s" repeatCount="indefinite"
+    keyTimes="0;0.2;0.7;1" values="0;0.7;0.3;0"/>
+  <animate attributeName="r" dur="2.8s" begin="0.00s" repeatCount="indefinite"
+    keyTimes="0;0.2;1" values="0.08;0.26;0.06"/>
+</circle>
+<circle cx="10.53" cy="13.68" r="0.26" fill="#FFE9A0" opacity="0">
+  <animate attributeName="opacity" dur="2.8s" begin="0.35s" repeatCount="indefinite"
+    keyTimes="0;0.2;0.7;1" values="0;0.7;0.3;0"/>
+  <animate attributeName="r" dur="2.8s" begin="0.35s" repeatCount="indefinite"
+    keyTimes="0;0.2;1" values="0.08;0.26;0.06"/>
+</circle>
+<circle cx="1.37" cy="11.30" r="0.26" fill="#FFE9A0" opacity="0">
+  <animate attributeName="opacity" dur="2.8s" begin="0.70s" repeatCount="indefinite"
+    keyTimes="0;0.2;0.7;1" values="0;0.7;0.3;0"/>
+  <animate attributeName="r" dur="2.8s" begin="0.70s" repeatCount="indefinite"
+    keyTimes="0;0.2;1" values="0.08;0.26;0.06"/>
+</circle>
+<circle cx="1.37" cy="3.58" r="0.26" fill="#FFE9A0" opacity="0">
+  <animate attributeName="opacity" dur="2.8s" begin="1.05s" repeatCount="indefinite"
+    keyTimes="0;0.2;0.7;1" values="0;0.7;0.3;0"/>
+  <animate attributeName="r" dur="2.8s" begin="1.05s" repeatCount="indefinite"
+    keyTimes="0;0.2;1" values="0.08;0.26;0.06"/>
+</circle>
+<circle cx="10.53" cy="1.20" r="0.26" fill="#FFE9A0" opacity="0">
+  <animate attributeName="opacity" dur="2.8s" begin="1.40s" repeatCount="indefinite"
+    keyTimes="0;0.2;0.7;1" values="0;0.7;0.3;0"/>
+  <animate attributeName="r" dur="2.8s" begin="1.40s" repeatCount="indefinite"
+    keyTimes="0;0.2;1" values="0.08;0.26;0.06"/>
+</circle>
+  
+  
+</g>
 <ellipse id="shadow-js" cx="8" cy="24.85" rx="4.75" ry="0.76" fill="#000" opacity="0.18"/>
 <g id="body-js">
   <animateTransform attributeName="transform" type="translate"
