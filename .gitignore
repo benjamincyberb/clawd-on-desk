@@ -23,6 +23,7 @@ docs/**
 !docs/guides/cultivator-asset-standard.md
 !docs/guides/cultivator-asset-pipeline.md
 !docs/guides/cultivator-asset-lessons.md
+!docs/guides/naruto-asset-standard.md
 !docs/guides/known-limitations.md
 !docs/guides/known-limitations.zh-CN.md
 !docs/guides/setup-guide.md
@@ -119,6 +120,13 @@ scripts/*
 !scripts/build-cultivator-state-viewer.js
 !scripts/build-petdex.js
 !scripts/preview-petdex.js
+# Naruto merit theme asset pipeline (active)
+!scripts/embed-naruto-chibi-assets.js
+!scripts/make-naruto-pngs-transparent.py
+!scripts/split-naruto-working-sheets.py
+!scripts/generate-naruto-stub-assets.js
+!scripts/embed-naruto-ssr-assets.js
+!scripts/build-naruto-ornate-svg.js
 # Cultivator pipeline — DEPRECATED repair scripts (kept for archaeology; do not use)
 !scripts/lock-cultivator-working-to-idle.js
 !scripts/composite-cultivator-knock-on-idle.js

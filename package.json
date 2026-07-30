@@ -22,6 +22,9 @@
     "create-theme": "node scripts/create-theme.js",
     "generate:cultivator-assets": "node scripts/generate-cultivator-assets.js",
     "check:cultivator-assets": "node scripts/generate-cultivator-assets.js --check",
+    "generate:naruto-stub-assets": "node scripts/generate-naruto-stub-assets.js",
+    "embed:naruto-ssr": "node scripts/embed-naruto-ssr-assets.js",
+    "build:naruto-ornate": "node scripts/build-naruto-ornate-svg.js",
     "embed:cultivator-ai-svgs": "node scripts/embed-cultivator-ai-svgs.js",
     "preview:cultivator-stage": "node scripts/build-cultivator-stage-preview.js",
     "preview:cultivator-states": "node scripts/build-cultivator-state-viewer.js",
@@ -61,7 +64,10 @@
     "install:workbuddy-hooks": "node hooks/workbuddy-install.js",
     "uninstall:workbuddy-hooks": "node hooks/workbuddy-install.js --uninstall",
     "cleanup:integrations": "node hooks/cleanup-integrations.js --apply",
-    "register-protocol:dev": "node launch.js --register-protocol"
+    "register-protocol:dev": "node launch.js --register-protocol",
+    "embed:naruto-chibi": "node scripts/embed-naruto-chibi-assets.js",
+    "prepare:naruto-chibi": "PYTHONPATH=.tools/pillow python3 scripts/make-naruto-pngs-transparent.py",
+    "split:naruto-working": "PYTHONPATH=.tools/pillow python3 scripts/split-naruto-working-sheets.py"
   },
   "keywords": [
     "clawd",

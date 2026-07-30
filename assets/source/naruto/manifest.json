@@ -1,0 +1,172 @@
+{
+  "id": "naruto",
+  "viewBox": { "x": -8, "y": -6, "width": 32, "height": 32 },
+  "layout": {
+    "contentBox": { "x": 0, "y": 0, "width": 16, "height": 20 },
+    "centerX": 8,
+    "baselineY": 20,
+    "visibleHeightRatio": 0.62,
+    "baselineBottomRatio": 0.18
+  },
+  "hitBoxes": {
+    "default": { "x": 0, "y": 2, "w": 16, "h": 16 },
+    "sleeping": { "x": 0, "y": 6, "w": 16, "h": 12 }
+  },
+  "styleGuide": {
+    "outline": "#1A1208",
+    "outlineWidth": 0.38,
+    "orange": "#F06B1F",
+    "orangeDark": "#C44E12",
+    "blackSuit": "#1C1C22",
+    "chakraBlue": "#4DB8FF",
+    "chakraGold": "#FFD84A",
+    "sageOrange": "#E67E22",
+    "kuramaRed": "#C0392B",
+    "blush": "#F4A6A0"
+  },
+  "stages": [
+    {
+      "id": "academy",
+      "requiredMerit": 0,
+      "name": {
+        "en": "Academy Student",
+        "zh": "学院学生",
+        "zh-TW": "學院學生",
+        "ko": "닌자학교 생도",
+        "ja": "忍者学校生"
+      },
+      "palette": {
+        "suit": "#F06B1F",
+        "suitDark": "#C44E12",
+        "skin": "#FFE8D6",
+        "hair": "#F5C842",
+        "accent": "#1C1C22",
+        "chakra": "#4DB8FF"
+      },
+      "accessories": []
+    },
+    {
+      "id": "genin",
+      "requiredMerit": 5,
+      "name": {
+        "en": "Genin · Shadow Clone",
+        "zh": "下忍·影分身",
+        "zh-TW": "下忍·影分身",
+        "ko": "하급닌자 · 그림자분신",
+        "ja": "下忍·影分身"
+      },
+      "palette": {
+        "suit": "#F06B1F",
+        "suitDark": "#C44E12",
+        "skin": "#FFE8D6",
+        "hair": "#F5C842",
+        "accent": "#1C1C22",
+        "chakra": "#4DB8FF"
+      },
+      "accessories": ["headband", "cloneAfterimage"]
+    },
+    {
+      "id": "sage",
+      "requiredMerit": 50,
+      "name": {
+        "en": "Sage Mode",
+        "zh": "仙人模式",
+        "zh-TW": "仙人模式",
+        "ko": "선인 모드",
+        "ja": "仙人モード"
+      },
+      "palette": {
+        "suit": "#F06B1F",
+        "suitDark": "#C44E12",
+        "skin": "#FFE8D6",
+        "hair": "#F5C842",
+        "accent": "#E67E22",
+        "chakra": "#E67E22"
+      },
+      "accessories": ["headband", "sageMarkings"]
+    },
+    {
+      "id": "kcm",
+      "requiredMerit": 150,
+      "name": {
+        "en": "Nine-Tails Chakra Mode",
+        "zh": "九尾查克拉模式",
+        "zh-TW": "九尾查克拉模式",
+        "ko": "구미 차크라 모드",
+        "ja": "九尾チャクラモード"
+      },
+      "palette": {
+        "suit": "#FFD84A",
+        "suitDark": "#E6B800",
+        "skin": "#FFE8D6",
+        "hair": "#F5C842",
+        "accent": "#1C1C22",
+        "chakra": "#FFD84A"
+      },
+      "accessories": ["chakraCloak", "sealMarks"]
+    },
+    {
+      "id": "sixpaths",
+      "requiredMerit": 300,
+      "name": {
+        "en": "Six Paths Sage Mode",
+        "zh": "六道仙人模式",
+        "zh-TW": "六道仙人模式",
+        "ko": "육도선인 모드",
+        "ja": "六道仙人モード"
+      },
+      "palette": {
+        "suit": "#FFD84A",
+        "suitDark": "#E67E22",
+        "skin": "#FFE8D6",
+        "hair": "#F5C842",
+        "accent": "#1C1C22",
+        "chakra": "#FFD84A"
+      },
+      "accessories": ["kuramaCloak", "truthSeekerOrbs", "magatama"]
+    },
+    {
+      "id": "kurama",
+      "requiredMerit": 500,
+      "name": {
+        "en": "Kurama Mode",
+        "zh": "尾兽模式·九尾",
+        "zh-TW": "尾獸模式·九尾",
+        "ko": "미수 모드 · 구미",
+        "ja": "尾獣モード·九喇嘛"
+      },
+      "palette": {
+        "suit": "#FFD84A",
+        "suitDark": "#C0392B",
+        "skin": "#FFF5E6",
+        "hair": "#F5C842",
+        "accent": "#C0392B",
+        "chakra": "#FFD84A"
+      },
+      "accessories": ["kuramaSilhouette", "bakedAura", "spiralMarks"]
+    }
+  ],
+  "actions": ["idle", "thinking", "working", "attention", "error", "sleeping"],
+  "styleRef": {
+    "source": "naruto-ssr",
+    "externalRoot": "/Users/Admin/Projects/naruto-ssr",
+    "note": "Reference-only Storm SSR art. MUST NOT ship original PNGs in themes/naruto. See docs/guides/naruto-asset-standard.md §2.",
+    "maps": [
+      {
+        "role": "baseIdentity",
+        "path": "public/characters/naruto.png",
+        "stages": ["genin", "academy", "sage", "kcm", "sixpaths", "kurama"]
+      },
+      {
+        "role": "sixpathsMood",
+        "path": "public/war/sixpaths.png",
+        "stages": ["sixpaths"]
+      },
+      {
+        "role": "kuramaMood",
+        "path": "public/war/jinchuriki.png",
+        "stages": ["kurama"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "name": "Naruto",
+  "author": "clawd-on-desk",
+  "version": "0.1.0",
+  "description": "Naruto power-form desk pet — standalone transparent chibi characters for idle and thinking.",
+  "preview": "academy-idle.svg",
+  "viewBox": {
+    "x": -8,
+    "y": -6,
+    "width": 32,
+    "height": 32
+  },
+  "layout": {
+    "contentBox": {
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 20
+    },
+    "centerX": 8,
+    "baselineY": 20,
+    "visibleHeightRatio": 0.62,
+    "baselineBottomRatio": 0.18
+  },
+  "eyeTracking": {
+    "enabled": false,
+    "states": [
+      "idle"
+    ],
+    "eyeRatioX": 0.5,
+    "eyeRatioY": 0.42,
+    "maxOffset": 2.2,
+    "bodyScale": 0.28,
+    "shadowStretch": 0.12,
+    "shadowShift": 0.25,
+    "ids": {
+      "eyes": "eyes-js",
+      "body": "body-js",
+      "shadow": "shadow-js"
+    },
+    "shadowOrigin": "8px 19px"
+  },
+  "rendering": {
+    "svgChannel": "object"
+  },
+  "sleepSequence": {
+    "mode": "direct"
+  },
+  "states": {
+    "idle": [
+      "academy-idle.svg"
+    ],
+    "thinking": [
+      "academy-thinking.svg"
+    ],
+    "working": [
+      "academy-working.svg"
+    ],
+    "juggling": [
+      "academy-working.svg"
+    ],
+    "attention": [
+      "academy-attention.svg"
+    ],
+    "error": [
+      "academy-error.svg"
+    ],
+    "notification": [
+      "academy-attention.svg"
+    ],
+    "sleeping": [
+      "academy-sleeping.svg"
+    ],
+    "sweeping": {
+      "fallbackTo": "working"
+    },
+    "carrying": {
+      "fallbackTo": "working"
+    }
+  },
+  "workingTiers": [
+    {
+      "minSessions": 1,
+      "file": "academy-working.svg"
+    }
+  ],
+  "hitBoxes": {
+    "default": {
+      "x": 0,
+      "y": 2,
+      "w": 16,
+      "h": 16
+    },
+    "sleeping": {
+      "x": 0,
+      "y": 6,
+      "w": 16,
+      "h": 12
+    }
+  },
+  "objectScale": {
+    "widthRatio": 1.85,
+    "heightRatio": 1.55,
+    "offsetX": -0.32,
+    "offsetY": -0.22
+  },
+  "meritCultivator": {
+    "enabled": true,
+    "params": {
+      "meritPerSec": 1,
+      "meritPerTick": 1,
+      "meritTickMs": 550,
+      "completionMerit": 50,
+      "errorMerit": 5,
+      "maxMeritPerSec": 1,
+      "minEventCooldownMs": 1000,
+      "dailyBonus": 0,
+      "streakDays": 7,
+      "streakBonus": 0,
+      "dailyCap": 10000
+    },
+    "stages": [
+      {
+        "id": "academy",
+        "requiredMerit": 0,
+        "name": {
+          "en": "Academy Student",
+          "zh": "学院学生",
+          "zh-TW": "學院學生",
+          "ko": "닌자학교 생도",
+          "ja": "忍者学校生"
+        }
+      },
+      {
+        "id": "genin",
+        "requiredMerit": 5,
+        "name": {
+          "en": "Genin · Shadow Clone",
+          "zh": "下忍·影分身",
+          "zh-TW": "下忍·影分身",
+          "ko": "하급닌자 · 그림자분신",
+          "ja": "下忍·影分身"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "genin-idle.svg"
+            ],
+            "thinking": [
+              "genin-thinking.svg"
+            ],
+            "working": [
+              "genin-working.svg"
+            ],
+            "juggling": [
+              "genin-working.svg"
+            ],
+            "attention": [
+              "genin-attention.svg"
+            ],
+            "error": [
+              "genin-error.svg"
+            ],
+            "notification": [
+              "genin-attention.svg"
+            ],
+            "sleeping": [
+              "genin-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "genin-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "sage",
+        "requiredMerit": 50,
+        "name": {
+          "en": "Sage Mode",
+          "zh": "仙人模式",
+          "zh-TW": "仙人模式",
+          "ko": "선인 모드",
+          "ja": "仙人モード"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "sage-idle.svg"
+            ],
+            "thinking": [
+              "sage-thinking.svg"
+            ],
+            "working": [
+              "sage-working.svg"
+            ],
+            "juggling": [
+              "sage-working.svg"
+            ],
+            "attention": [
+              "sage-attention.svg"
+            ],
+            "error": [
+              "sage-error.svg"
+            ],
+            "notification": [
+              "sage-attention.svg"
+            ],
+            "sleeping": [
+              "sage-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "sage-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "kcm",
+        "requiredMerit": 150,
+        "name": {
+          "en": "Nine-Tails Chakra Mode",
+          "zh": "九尾查克拉模式",
+          "zh-TW": "九尾查克拉模式",
+          "ko": "구미 차크라 모드",
+          "ja": "九尾チャクラモード"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "kcm-idle.svg"
+            ],
+            "thinking": [
+              "kcm-thinking.svg"
+            ],
+            "working": [
+              "kcm-working.svg"
+            ],
+            "juggling": [
+              "kcm-working.svg"
+            ],
+            "attention": [
+              "kcm-attention.svg"
+            ],
+            "error": [
+              "kcm-error.svg"
+            ],
+            "notification": [
+              "kcm-attention.svg"
+            ],
+            "sleeping": [
+              "kcm-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "kcm-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "sixpaths",
+        "requiredMerit": 300,
+        "name": {
+          "en": "Six Paths Sage Mode",
+          "zh": "六道仙人模式",
+          "zh-TW": "六道仙人模式",
+          "ko": "육도선인 모드",
+          "ja": "六道仙人モード"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "sixpaths-idle.svg"
+            ],
+            "thinking": [
+              "sixpaths-thinking.svg"
+            ],
+            "working": [
+              "sixpaths-working.svg"
+            ],
+            "juggling": [
+              "sixpaths-working.svg"
+            ],
+            "attention": [
+              "sixpaths-attention.svg"
+            ],
+            "error": [
+              "sixpaths-error.svg"
+            ],
+            "notification": [
+              "sixpaths-attention.svg"
+            ],
+            "sleeping": [
+              "sixpaths-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "sixpaths-working.svg"
+            }
+          ]
+        }
+      },
+      {
+        "id": "kurama",
+        "requiredMerit": 500,
+        "name": {
+          "en": "Kurama Mode",
+          "zh": "尾兽模式·九尾",
+          "zh-TW": "尾獸模式·九尾",
+          "ko": "미수 모드 · 구미",
+          "ja": "尾獣モード·九喇嘛"
+        },
+        "visuals": {
+          "states": {
+            "idle": [
+              "kurama-idle.svg"
+            ],
+            "thinking": [
+              "kurama-thinking.svg"
+            ],
+            "working": [
+              "kurama-idle.svg"
+            ],
+            "juggling": [
+              "kurama-idle.svg"
+            ],
+            "attention": [
+              "kurama-attention.svg"
+            ],
+            "error": [
+              "kurama-error.svg"
+            ],
+            "notification": [
+              "kurama-attention.svg"
+            ],
+            "sleeping": [
+              "kurama-sleeping.svg"
+            ]
+          },
+          "workingTiers": [
+            {
+              "minSessions": 1,
+              "file": "kurama-idle.svg"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
