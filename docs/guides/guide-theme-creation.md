@@ -78,6 +78,71 @@ my-theme/
     confirm.mp3
 ```
 
+## Rive Themes (Open `.riv` Backend)
+
+Clawd can render user themes backed by a Rive (`.riv`) file instead of SVG/GIF frames. This is an **open platform** path: anyone can ship a zip with `theme.json` + `assets/*.riv`. Treat `.riv` as **untrusted binary** — only import packages you trust.
+
+### Scaffold
+
+```bash
+node scripts/create-theme.js my-rive-pet --rive --name "My Rive Pet"
+```
+
+This copies `themes/template-rive/` (includes a sample `assets/pet.riv`) into your user themes directory.
+
+### Minimal `theme.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "My Rive Pet",
+  "version": "1.0.0",
+  "renderBackend": "rive",
+  "rive": {
+    "file": "pet.riv",
+    "stateMachine": "Login Machine",
+    "inputs": { "level": "numLook", "hover": "isHandsUp", "bump": "trigSuccess" },
+    "stateLevels": { "idle": 0, "thinking": 1, "working": 2, "juggling": 2 }
+  },
+  "viewBox": { "x": 0, "y": 0, "width": 256, "height": 256 },
+  "eyeTracking": { "enabled": false },
+  "sleepSequence": { "mode": "direct" },
+  "states": {
+    "idle": ["pet.riv"],
+    "thinking": ["pet.riv"],
+    "working": ["pet.riv"],
+    "sleeping": { "fallbackTo": "idle" },
+    "waking": ["pet.riv"]
+  }
+}
+```
+
+### Convention-first defaults
+
+If you omit parts of `rive`, Clawd fills in:
+
+| Field | Default |
+|-------|---------|
+| State machine candidates | `Login Machine` → `Clawd` → `Designer's Test` → `State Machine 1` |
+| Level / look | `Level` (skills) or auto `numLook` (teddy) |
+| Hover | `Hovering` or auto `isHandsUp` (teddy) |
+| Click / bump | `bump` or auto `trigSuccess` (teddy) |
+
+The stock scaffold ships the classic login Teddy. The renderer also auto-detects teddy inputs (`numLook` / `isHandsUp` / `isChecking` / `trigSuccess`) so agent states map to look / cover-eyes / success-fail without extra config.
+
+Override `rive.stateMachine`, `rive.inputs`, or `rive.stateLevels` only when your `.riv` uses different names.
+
+### Limits (v1)
+
+- `eyeTracking`, pet tint, and accessories are **not** supported on Rive themes
+- Max `.riv` size: 20 MB
+- Assets must live under `assets/` (basename only; no CDN URLs)
+- Switching between SVG and Rive themes reloads a different render entry (`index.html` ↔ `index-rive.html`)
+
+### Package & import
+
+Zip shape is the same as SVG themes. Settings → Theme → **Import Clawd theme package (.zip)** accepts `.riv` assets. A Rive import shows an untrusted-binary warning toast.
+
 ## Creation Tiers
 
 ### Beginner: Swap Art + GIF Animations (Hours)

@@ -67,7 +67,15 @@
     "register-protocol:dev": "node launch.js --register-protocol",
     "embed:naruto-chibi": "node scripts/embed-naruto-chibi-assets.js",
     "prepare:naruto-chibi": "PYTHONPATH=.tools/pillow python3 scripts/make-naruto-pngs-transparent.py",
-    "split:naruto-working": "PYTHONPATH=.tools/pillow python3 scripts/split-naruto-working-sheets.py"
+    "split:naruto-working": "PYTHONPATH=.tools/pillow python3 scripts/split-naruto-working-sheets.py",
+    "vendor:pixi": "mkdir -p src/vendor && cp node_modules/pixi.js/dist/pixi.min.js src/vendor/pixi.min.js && cp node_modules/pixi.js/dist/packages/unsafe-eval.min.js src/vendor/pixi-unsafe-eval.js && cp node_modules/pixi.js/LICENSE src/vendor/PIXI-LICENSE",
+    "vendor:rive": "node scripts/vendor-rive.js",
+    "start:pixi-spike": "CLAWD_PIXI_SPIKE=1 node launch.js",
+    "start:rive-spike": "CLAWD_RIVE_SPIKE=1 node launch.js",
+    "smoke:pixi-spike": "node scripts/smoke-pixi-spike.js",
+    "check:pixi-spike": "node scripts/smoke-pixi-spike.js",
+    "smoke:rive-spike": "node scripts/smoke-rive-spike.js",
+    "check:rive-spike": "node scripts/smoke-rive-spike.js"
   },
   "keywords": [
     "clawd",
@@ -193,8 +201,10 @@
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
+    "@rive-app/canvas-single": "^2.39.1",
     "electron": "^41.10.2",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "pixi.js": "8.15.0"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.71.1",

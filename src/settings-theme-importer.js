@@ -5,7 +5,9 @@ const defaultPath = require("path");
 const codexPetImporter = require("./codex-pet-importer");
 const {
   collectRequiredAssetFiles,
+  MAX_RIVE_FILE_BYTES,
   mergeDefaults,
+  resolveThemeRenderBackend,
   validateTheme,
 } = require("./theme-schema");
 
@@ -92,6 +94,17 @@ function validateExtractedTheme({ fs, path, stagingDir, themeId }) {
   if (missingAssets.length > 0) {
     throw new Error(`theme zip is missing asset file${missingAssets.length === 1 ? "" : "s"}: ${missingAssets.join(", ")}`);
   }
+
+  // Untrusted binary: cap .riv size (same limit as theme-schema / renderer).
+  const rivFiles = collectRequiredAssetFiles(effective)
+    .filter((filename) => String(filename).toLowerCase().endsWith(".riv"));
+  for (const filename of rivFiles) {
+    const rivPath = path.join(stagingDir, "assets", filename);
+    const rivStat = fs.statSync(rivPath);
+    if (rivStat.size > MAX_RIVE_FILE_BYTES) {
+      throw new Error(`.riv asset "${filename}" exceeds ${MAX_RIVE_FILE_BYTES} bytes`);
+    }
+  }
   return raw;
 }
 
@@ -154,11 +167,14 @@ function importUserThemeZip(zipPath, options = {}) {
     const raw = validateExtractedTheme({ fs, path, stagingDir, themeId });
     if (fs.existsSync(targetDir)) throw new Error(`theme "${themeId}" already exists`);
     fs.renameSync(stagingDir, targetDir);
+    const renderBackend = resolveThemeRenderBackend(raw);
     return {
       status: "ok",
       themeId,
       name: raw && raw.name,
       path: targetDir,
+      renderBackend,
+      rive: renderBackend === "rive",
     };
   } catch (err) {
     fs.rmSync(stagingDir, { recursive: true, force: true });

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onKimiPermissionPulse: (callback) => ipcRenderer.on("kimi-permission-pulse", () => callback()),
   onEyeMove: (callback) => ipcRenderer.on("eye-move", (_, dx, dy) => callback(dx, dy)),
   onCloudlingPointer: (callback) => ipcRenderer.on("cloudling-pointer", (_, payload) => callback(payload)),
+  // Dev-only Pixi spike: local cursor in pet-window CSS pixels (render window ignores mouse)
+  onPixiCursor: (callback) => ipcRenderer.on("pixi-cursor", (_, payload) => callback(payload)),
   onRoamHeading: (callback) => ipcRenderer.on("roam-heading", (_, headingLeft) => callback(headingLeft)),
   onWakeFromDoze: (callback) => ipcRenderer.on("wake-from-doze", () => callback()),
   onDndChange: (callback) => ipcRenderer.on("dnd-change", (_, enabled) => callback(enabled)),

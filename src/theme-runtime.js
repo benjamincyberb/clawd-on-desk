@@ -3,6 +3,7 @@
 const defaultFs = require("fs");
 const defaultPath = require("path");
 const { resolveProgressionStageFromBucket } = require("./theme-progression");
+const { resolveThemeRenderBackend } = require("./theme-schema");
 
 // Design invariant: this closure is the only active-theme owner. theme-loader
 // stays a stateless loader; legacy active facades must delegate here.
@@ -35,6 +36,7 @@ function createThemeRuntime(options = {}) {
   const getMiniRuntime = options.getMiniRuntime || (() => null);
   const getAnimationOverridesRuntime = options.getAnimationOverridesRuntime || (() => null);
   const getFadeSequencer = options.getFadeSequencer || (() => null);
+  const getRenderEntryPathForTheme = options.getRenderEntryPathForTheme || (() => null);
   const getPetWindowBounds = options.getPetWindowBounds || (() => null);
   const applyPetWindowBounds = options.applyPetWindowBounds || (() => null);
   const computeFinalDragBounds = options.computeFinalDragBounds || (() => null);
@@ -231,6 +233,17 @@ function createThemeRuntime(options = {}) {
       callMethod(miniRuntime, "exitMiniMode");
     }
 
+    const previousBackend = resolveThemeRenderBackend(activeTheme);
+    const nextBackend = resolveThemeRenderBackend(newTheme);
+    let renderLoadFilePath = null;
+    if (previousBackend !== nextBackend) {
+      try {
+        renderLoadFilePath = getRenderEntryPathForTheme(newTheme) || null;
+      } catch {
+        renderLoadFilePath = null;
+      }
+    }
+
     setActiveTheme(newTheme);
     callMethod(miniRuntime, "refreshTheme");
     callMethod(stateRuntime, "refreshTheme");
@@ -278,6 +291,7 @@ function createThemeRuntime(options = {}) {
     callMethod(sequencer, "run", {
       onReloadFinished: () => finishThemeReload(),
       onFallback: () => finishThemeReload(),
+      renderLoadFilePath,
     });
 
     flushRuntimeStateToPrefs();

@@ -87,4 +87,30 @@ describe("create-theme scaffold", () => {
       /already exists/
     );
   });
+
+  it("scaffolds a Rive theme from template-rive when --rive is set", () => {
+    const themesRoot = makeTmpDir();
+    const result = createTheme.createThemeScaffold({
+      themeId: "skills-pet",
+      name: "Skills Pet",
+      author: "Ruller",
+      themesRoot,
+      rive: true,
+    });
+
+    assert.strictEqual(result.rive, true);
+    assert.ok(fs.existsSync(path.join(result.targetDir, "assets", "pet.riv")));
+    const themeJson = JSON.parse(fs.readFileSync(path.join(result.targetDir, "theme.json"), "utf8"));
+    assert.strictEqual(themeJson.renderBackend, "rive");
+    assert.strictEqual(themeJson.rive.file, "pet.riv");
+    assert.strictEqual(themeJson.name, "Skills Pet");
+    assert.strictEqual(themeJson.author, "Ruller");
+  });
+
+  it("parseArgs accepts --rive", () => {
+    const opts = createTheme.parseArgs(["cool-pet", "--rive", "--name", "Cool"]);
+    assert.strictEqual(opts.rive, true);
+    assert.strictEqual(opts.themeId, "cool-pet");
+    assert.strictEqual(opts.name, "Cool");
+  });
 });

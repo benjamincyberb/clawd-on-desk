@@ -79,6 +79,106 @@ const VISUAL_FALLBACK_STATES = new Set([
   "roam",
 ]);
 
+const RENDER_BACKENDS = new Set(["svg", "rive"]);
+const DEFAULT_RIVE_STATE_LEVELS = {
+  idle: 0,
+  thinking: 1,
+  working: 2,
+  juggling: 2,
+  sleeping: 0,
+  dozing: 0,
+  yawning: 0,
+  collapsing: 0,
+  waking: 0,
+  "mini-idle": 0,
+  "mini-sleep": 0,
+  "mini-peek": 1,
+  "mini-alert": 2,
+  "mini-happy": 1,
+};
+const DEFAULT_RIVE_INPUTS = {
+  level: "Level",
+  hover: "Hovering",
+  bump: "bump",
+};
+const DEFAULT_RIVE_STATE_MACHINES = [
+  "Login Machine",
+  "Clawd",
+  "Designer's Test",
+  "State Machine 1",
+];
+const MAX_RIVE_FILE_BYTES = 20 * 1024 * 1024;
+
+function resolveThemeRenderBackend(themeOrRaw) {
+  if (!themeOrRaw || typeof themeOrRaw !== "object") return "svg";
+  const explicit = typeof themeOrRaw.renderBackend === "string"
+    ? themeOrRaw.renderBackend.trim().toLowerCase()
+    : "";
+  if (explicit === "rive") return "rive";
+  if (explicit === "svg" || explicit === "pixi") return "svg";
+  // Infer from rive.file or .riv state bindings when author omits renderBackend.
+  if (isPlainObject(themeOrRaw.rive) && typeof themeOrRaw.rive.file === "string" && themeOrRaw.rive.file) {
+    return "rive";
+  }
+  const idleFiles = getStateFiles(themeOrRaw.states && themeOrRaw.states.idle);
+  if (idleFiles.some((f) => typeof f === "string" && f.toLowerCase().endsWith(".riv"))) {
+    return "rive";
+  }
+  return "svg";
+}
+
+function normalizeRiveConfig(rawRive, rawTheme) {
+  const backend = resolveThemeRenderBackend(rawTheme);
+  if (backend !== "rive") {
+    return null;
+  }
+  const src = isPlainObject(rawRive) ? rawRive : {};
+  let file = typeof src.file === "string" ? basenameOnly(src.file) : "";
+  if (!file) {
+    const idleFiles = getStateFiles(rawTheme && rawTheme.states && rawTheme.states.idle);
+    file = idleFiles.find((f) => typeof f === "string" && f.toLowerCase().endsWith(".riv")) || "";
+    file = basenameOnly(file) || "";
+  }
+  const inputs = { ...DEFAULT_RIVE_INPUTS };
+  if (isPlainObject(src.inputs)) {
+    for (const key of Object.keys(DEFAULT_RIVE_INPUTS)) {
+      if (typeof src.inputs[key] === "string" && src.inputs[key].trim()) {
+        inputs[key] = src.inputs[key].trim();
+      }
+    }
+  }
+  const stateLevels = { ...DEFAULT_RIVE_STATE_LEVELS };
+  if (isPlainObject(src.stateLevels)) {
+    for (const [state, level] of Object.entries(src.stateLevels)) {
+      if (typeof state === "string" && state && Number.isFinite(level)) {
+        stateLevels[state] = Math.max(0, Math.min(2, Math.floor(level)));
+      }
+    }
+  }
+  let stateMachines = [];
+  if (typeof src.stateMachine === "string" && src.stateMachine.trim()) {
+    stateMachines.push(src.stateMachine.trim());
+  }
+  if (Array.isArray(src.stateMachines)) {
+    for (const name of src.stateMachines) {
+      if (typeof name === "string" && name.trim() && !stateMachines.includes(name.trim())) {
+        stateMachines.push(name.trim());
+      }
+    }
+  }
+  for (const name of DEFAULT_RIVE_STATE_MACHINES) {
+    if (!stateMachines.includes(name)) stateMachines.push(name);
+  }
+  return {
+    file: file || null,
+    stateMachine: stateMachines[0] || DEFAULT_RIVE_STATE_MACHINES[0],
+    stateMachines,
+    inputs,
+    stateLevels,
+    maxFileBytes: MAX_RIVE_FILE_BYTES,
+  };
+}
+
 function validateTheme(cfg) {
   const errors = [];
   const sleepMode = deriveSleepMode(cfg);
@@ -115,14 +215,37 @@ function validateTheme(cfg) {
     }
   }
 
+  if (cfg.renderBackend !== undefined) {
+    const backend = typeof cfg.renderBackend === "string"
+      ? cfg.renderBackend.trim().toLowerCase()
+      : "";
+    if (!RENDER_BACKENDS.has(backend)) {
+      errors.push(`renderBackend must be "svg" or "rive", got ${JSON.stringify(cfg.renderBackend)}`);
+    }
+  }
+
+  const resolvedBackend = resolveThemeRenderBackend(cfg);
+  if (resolvedBackend === "rive") {
+    if (cfg.rive !== undefined && !isPlainObject(cfg.rive)) {
+      errors.push("rive must be an object when present");
+    }
+    const riveCfg = normalizeRiveConfig(cfg.rive, cfg);
+    if (!riveCfg || !riveCfg.file || !riveCfg.file.toLowerCase().endsWith(".riv")) {
+      errors.push('renderBackend "rive" requires rive.file or states.idle to reference a .riv asset');
+    }
+    if (cfg.eyeTracking && cfg.eyeTracking.enabled) {
+      errors.push('eyeTracking.enabled is not supported with renderBackend "rive"');
+    }
+  }
+
   if (cfg.eyeTracking && cfg.eyeTracking.enabled) {
     if (!Array.isArray(cfg.eyeTracking.states) || cfg.eyeTracking.states.length === 0) {
       errors.push("eyeTracking.states must be a non-empty array when eyeTracking.enabled=true");
     }
   }
 
-  // eyeTracking.states listed states must use .svg if enabled
-  if (cfg.eyeTracking && cfg.eyeTracking.enabled && cfg.states) {
+  // eyeTracking.states listed states must use .svg if enabled (SVG backend only)
+  if (resolvedBackend !== "rive" && cfg.eyeTracking && cfg.eyeTracking.enabled && cfg.states) {
     for (const stateName of (cfg.eyeTracking.states || [])) {
       const files = getStateFiles(cfg.states[stateName]).length > 0
         ? getStateFiles(cfg.states[stateName])
@@ -827,6 +950,7 @@ function buildCapabilities(cfg, options = {}) {
     ),
     accessories: deriveAccessoryCapability(cfg),
     meritCultivator,
+    renderBackend: resolveThemeRenderBackend(cfg),
   };
 }
 
@@ -839,6 +963,9 @@ function collectRequiredAssetFiles(theme) {
   const files = new Set();
   for (const usage of projectThemeVisualUsages(theme)) {
     addThemeAssetFile(files, usage.file);
+  }
+  if (theme && theme.rive && typeof theme.rive.file === "string") {
+    addThemeAssetFile(files, theme.rive.file);
   }
   if (isPlainObject(theme && theme.meritCultivator) && Array.isArray(theme.meritCultivator.stages)) {
     const { collectProgressionAssetFiles } = require("./theme-progression");
@@ -1022,10 +1149,21 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   // trustedRuntime grants script execution capability, so it requires loader-derived built-in trust.
   theme.trustedRuntime = normalizeTrustedRuntime(raw.trustedRuntime, isBuiltin, themeId);
   theme.rendering = normalizeRendering(raw.rendering);
+  theme.renderBackend = resolveThemeRenderBackend(raw);
+  theme.rive = normalizeRiveConfig(raw.rive, { ...raw, renderBackend: theme.renderBackend });
+  // Rive themes cannot use SVG eye-tracking / tint / accessories in v1.
+  if (theme.renderBackend === "rive") {
+    theme.eyeTracking = {
+      ...DEFAULT_EYE_TRACKING,
+      enabled: false,
+      states: [],
+    };
+  }
   theme.customization = {
     petTint: !!(
       isPlainObject(raw.customization)
       && raw.customization.petTint === true
+      && theme.renderBackend !== "rive"
     ),
     accessories: null,
   };
@@ -1065,12 +1203,14 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     theme.layout = null;
   }
 
-  // eyeTracking
-  theme.eyeTracking = { ...DEFAULT_EYE_TRACKING, ...(raw.eyeTracking || {}) };
-  theme.eyeTracking.ids = {
-    ...DEFAULT_EYE_TRACKING.ids,
-    ...(raw.eyeTracking && raw.eyeTracking.ids || {}),
-  };
+  // eyeTracking (already forced off for rive above)
+  if (theme.renderBackend !== "rive") {
+    theme.eyeTracking = { ...DEFAULT_EYE_TRACKING, ...(raw.eyeTracking || {}) };
+    theme.eyeTracking.ids = {
+      ...DEFAULT_EYE_TRACKING.ids,
+      ...(raw.eyeTracking && raw.eyeTracking.ids || {}),
+    };
+  }
 
   theme.sleepSequence = { mode: deriveSleepMode(raw) };
 
@@ -1097,10 +1237,12 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     theme.miniMode = { supported: false, states: {}, viewBox: null, timings: { minDisplay: {}, autoReturn: {} }, glyphFlips: {} };
   }
 
-  theme.customization.accessories = normalizeAccessoryAttachments(
-    isPlainObject(raw.customization) ? raw.customization.accessories : undefined,
-    theme
-  ).value;
+  theme.customization.accessories = theme.renderBackend === "rive"
+    ? null
+    : normalizeAccessoryAttachments(
+      isPlainObject(raw.customization) ? raw.customization.accessories : undefined,
+      theme
+    ).value;
 
   // Merge mini timings into main timings for state.js convenience
   if (theme.miniMode.timings) {
@@ -1206,6 +1348,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   }
   if (Array.isArray(theme.wideHitboxFiles)) theme.wideHitboxFiles = theme.wideHitboxFiles.map(bn);
   if (Array.isArray(theme.sleepingHitboxFiles)) theme.sleepingHitboxFiles = theme.sleepingHitboxFiles.map(bn);
+  if (theme.rive && theme.rive.file) theme.rive.file = bn(theme.rive.file);
 
   return theme;
 }
@@ -1222,6 +1365,13 @@ module.exports = {
   FULL_SLEEP_REQUIRED_STATES,
   MINI_REQUIRED_STATES,
   VISUAL_FALLBACK_STATES,
+  RENDER_BACKENDS,
+  DEFAULT_RIVE_STATE_LEVELS,
+  DEFAULT_RIVE_INPUTS,
+  DEFAULT_RIVE_STATE_MACHINES,
+  MAX_RIVE_FILE_BYTES,
+  resolveThemeRenderBackend,
+  normalizeRiveConfig,
   validateTheme,
   mergeDefaults,
   isPlainObject,

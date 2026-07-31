@@ -920,6 +920,7 @@ describe("theme-loader capability metadata", () => {
         params: meta.capabilities.meritCultivator.params,
         stages: null,
       },
+      renderBackend: "svg",
     });
 
     const listed = themeLoader.listThemesWithMetadata().find((theme) => theme.id === "capTheme");

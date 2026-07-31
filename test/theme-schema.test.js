@@ -504,3 +504,76 @@ describe("theme schema defaults and normalization", () => {
     ]);
   });
 });
+
+describe("theme schema rive backend", () => {
+  function validRiveTheme(overrides = {}) {
+    return validThemeJson({
+      renderBackend: "rive",
+      rive: { file: "pet.riv" },
+      eyeTracking: { enabled: false },
+      sleepSequence: { mode: "direct" },
+      states: {
+        idle: ["pet.riv"],
+        thinking: ["pet.riv"],
+        working: ["pet.riv"],
+        sleeping: { fallbackTo: "idle" },
+      },
+      ...overrides,
+    });
+  }
+
+  it("accepts convention-first rive themes and collects .riv assets", () => {
+    const raw = validRiveTheme();
+    assert.deepStrictEqual(schema.validateTheme(raw), []);
+    const merged = schema.mergeDefaults(raw, "rive-demo", false);
+    assert.strictEqual(merged.renderBackend, "rive");
+    assert.ok(merged.rive);
+    assert.strictEqual(merged.rive.file, "pet.riv");
+    assert.ok(merged.rive.stateMachines.includes("Clawd"));
+    assert.strictEqual(merged.eyeTracking.enabled, false);
+    assert.ok(schema.collectRequiredAssetFiles(merged).includes("pet.riv"));
+    assert.strictEqual(schema.buildCapabilities(merged).renderBackend, "rive");
+  });
+
+  it("infers rive backend from rive.file when renderBackend is omitted", () => {
+    const raw = validThemeJson({
+      rive: { file: "hero.riv" },
+      eyeTracking: { enabled: false },
+      sleepSequence: { mode: "direct" },
+      states: {
+        idle: ["hero.riv"],
+        thinking: ["hero.riv"],
+        working: ["hero.riv"],
+        sleeping: { fallbackTo: "idle" },
+      },
+    });
+    assert.strictEqual(schema.resolveThemeRenderBackend(raw), "rive");
+    assert.deepStrictEqual(schema.validateTheme(raw), []);
+  });
+
+  it("rejects eyeTracking with rive and missing .riv file", () => {
+    assert.ok(schema.validateTheme(validRiveTheme({
+      eyeTracking: { enabled: true, states: ["idle"] },
+    })).some((e) => e.includes("eyeTracking")));
+
+    assert.ok(schema.validateTheme(validThemeJson({
+      renderBackend: "rive",
+      eyeTracking: { enabled: false },
+    })).some((e) => e.includes("rive.file") || e.includes(".riv")));
+  });
+
+  it("normalizes optional rive input and level overrides", () => {
+    const cfg = schema.normalizeRiveConfig({
+      file: "a.riv",
+      stateMachine: "MySM",
+      inputs: { level: "Energy", hover: "Near" },
+      stateLevels: { working: 1 },
+    }, { renderBackend: "rive", rive: { file: "a.riv" } });
+    assert.strictEqual(cfg.stateMachine, "MySM");
+    assert.strictEqual(cfg.inputs.level, "Energy");
+    assert.strictEqual(cfg.inputs.hover, "Near");
+    assert.strictEqual(cfg.inputs.bump, "bump");
+    assert.strictEqual(cfg.stateLevels.working, 1);
+    assert.strictEqual(cfg.stateLevels.idle, 0);
+  });
+});

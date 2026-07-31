@@ -104,6 +104,9 @@ scripts/*
 !scripts/monitor-clawd-power.ps1
 !scripts/validate-theme.js
 !scripts/create-theme.js
+!scripts/vendor-rive.js
+!scripts/smoke-rive-spike.js
+!scripts/smoke-pixi-spike.js
 !scripts/export-agent-icons.js
 !scripts/verify-electron-install.js
 !scripts/audit-repository-assets.js

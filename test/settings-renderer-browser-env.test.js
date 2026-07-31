@@ -5427,6 +5427,9 @@ describe("settings renderer browser environment", () => {
     assert.strictEqual(strings.en.themeOpenUserThemesFolder, "Open themes folder");
     assert.strictEqual(strings.en.themeRefreshThemes, "Refresh themes");
     assert.strictEqual(strings.en.themeCapabilityFineMotion, "Fine motion");
+    assert.strictEqual(strings.en.themeCapabilityRive, "Rive");
+    assert.ok(strings.en.themeImportUserThemeZipHint.includes(".riv"));
+    assert.ok(String(strings.en.toastUserThemeZipImportRiveWarning || "").includes("untrusted"));
     assert.strictEqual(strings.en.themeCustomize, "Customize");
     assert.strictEqual(strings.en.rowPetAccessory, "Accessory");
     assert.strictEqual(strings.en.accessoryWizardHat, "Wizard hat");

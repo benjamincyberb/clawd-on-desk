@@ -1,0 +1,75 @@
+{
+  "_comment": "Clawd Rive Theme Template — copy to {userData}/themes/your-theme-id/ or scaffold with: node scripts/create-theme.js my-rive --rive",
+  "_scaffoldOnly": true,
+
+  "schemaVersion": 1,
+  "name": "My Rive Theme",
+  "author": "Your Name",
+  "version": "1.0.0",
+  "description": "Open Rive (.riv) desk-pet theme. Default sample is the classic login Teddy (CC BY JcToon).",
+
+  "renderBackend": "rive",
+  "rive": {
+    "_comment": "Teddy sample uses Login Machine + numLook / isHandsUp / isChecking / trigSuccess|trigFail. Skills-style files can use Level / Hovering / bump instead.",
+    "file": "pet.riv",
+    "stateMachine": "Login Machine",
+    "inputs": {
+      "level": "numLook",
+      "hover": "isHandsUp",
+      "bump": "trigSuccess"
+    },
+    "stateLevels": {
+      "idle": 0,
+      "thinking": 1,
+      "working": 2,
+      "juggling": 2
+    }
+  },
+
+  "customization": {
+    "petTint": false
+  },
+
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 256,
+    "height": 256
+  },
+
+  "layout": {
+    "contentBox": { "x": 48, "y": 32, "width": 160, "height": 192 },
+    "centerX": 128,
+    "baselineY": 224,
+    "visibleHeightRatio": 0.75,
+    "baselineBottomRatio": 0.05
+  },
+
+  "eyeTracking": {
+    "_comment": "Not supported with renderBackend rive — keep disabled.",
+    "enabled": false,
+    "states": []
+  },
+
+  "states": {
+    "_comment": "All agent states can share one .riv; the state machine carries the mood.",
+    "idle": ["pet.riv"],
+    "thinking": ["pet.riv"],
+    "working": ["pet.riv"],
+    "juggling": ["pet.riv"],
+    "error": { "fallbackTo": "attention" },
+    "attention": ["pet.riv"],
+    "notification": ["pet.riv"],
+    "sleeping": { "fallbackTo": "idle" },
+    "waking": ["pet.riv"]
+  },
+
+  "sleepSequence": {
+    "mode": "direct"
+  },
+
+  "reactions": {
+    "click": { "file": "pet.riv", "duration": 800 },
+    "drag": { "file": "pet.riv" }
+  }
+}

@@ -667,6 +667,7 @@ themeRuntime = createThemeRuntime({
   getMiniRuntime: () => _mini,
   getAnimationOverridesRuntime: () => animationOverridesMain,
   getFadeSequencer: () => themeFadeSequencer,
+  getRenderEntryPathForTheme: (theme) => resolveRenderEntryPath(theme),
   getPetWindowBounds,
   applyPetWindowBounds,
   computeFinalDragBounds,
@@ -1732,6 +1733,37 @@ function buildRendererThemeConfig() {
   return cfg;
 }
 
+// Render entry: env spikes override; otherwise follow active theme.renderBackend.
+// Theme switches that change backend use loadFile (see theme-fade-sequencer);
+// same-backend switches keep webContents.reload().
+const { resolveThemeRenderBackend } = require("./theme-schema");
+
+function resolveRenderBackend(theme) {
+  const explicit = String(process.env.CLAWD_RENDER_BACKEND || "").trim().toLowerCase();
+  if (explicit === "svg" || explicit === "pixi" || explicit === "rive") return explicit;
+  if (process.env.CLAWD_RIVE_SPIKE === "1") return "rive";
+  if (process.env.CLAWD_PIXI_SPIKE === "1") return "pixi";
+  const active = theme || (typeof getActiveTheme === "function" ? getActiveTheme() : null);
+  return resolveThemeRenderBackend(active);
+}
+
+function resolveRenderEntryFile(theme) {
+  const backend = resolveRenderBackend(theme);
+  if (backend === "pixi") {
+    try { console.log("[pixi-demo] render entry = index-pixi.html"); } catch {}
+    return "index-pixi.html";
+  }
+  if (backend === "rive") {
+    try { console.log("[rive] render entry = index-rive.html"); } catch {}
+    return "index-rive.html";
+  }
+  return "index.html";
+}
+
+function resolveRenderEntryPath(theme) {
+  return path.join(__dirname, resolveRenderEntryFile(theme));
+}
+
 const _stateCtx = {
   get theme() { return getActiveTheme(); },
   get win() { return win; },
@@ -1962,6 +1994,7 @@ function getSessionHudAnchorRect(bounds) { return petWindowRuntime.getSessionHud
 const _tickCtx = {
   get theme() { return getActiveTheme(); },
   get win() { return win; },
+  getRenderBackend: () => resolveRenderBackend(getActiveTheme()),
   getPetWindowBounds,
   get currentState() { return _state.getCurrentState(); },
   get currentSvg() { return _state.getCurrentSvg(); },
@@ -3906,7 +3939,7 @@ function createWindow() {
     initialWindowBounds,
     initialVirtualBounds,
     preloadPath: path.join(__dirname, "preload.js"),
-    loadFilePath: path.join(__dirname, "index.html"),
+    loadFilePath: path.join(__dirname, resolveRenderEntryFile()),
     themeConfig: buildRendererThemeConfig(),
     setRenderWindow: (createdWindow) => { win = createdWindow; },
     isQuitting: () => isQuitting,
@@ -4054,6 +4087,18 @@ function createWindow() {
     if (themeRuntime.isReloadInProgress()) return;
     syncRendererStateAfterLoad();
   });
+
+  // Dev-only: surface Pixi / Rive spike renderer logs in the main terminal.
+  const spikeBackend = resolveRenderBackend();
+  if ((spikeBackend === "pixi" || spikeBackend === "rive")
+    && win.webContents && typeof win.webContents.on === "function") {
+    const logPrefix = spikeBackend === "rive" ? "[rive-demo:renderer]" : "[pixi-demo:renderer]";
+    win.webContents.on("console-message", (event) => {
+      const message = event && event.message != null ? String(event.message) : "";
+      if (!message) return;
+      try { console.log(logPrefix, message); } catch {}
+    });
+  }
 
   // ── Crash recovery: renderer process can die from <object> churn ──
   win.webContents.on("render-process-gone", (_event, details) => {

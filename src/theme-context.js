@@ -102,6 +102,19 @@ function createThemeContext(theme, options = {}) {
       ) ? (theme.customization.accessories || null) : null,
       objectScale: theme.objectScale,
       transitions: theme.transitions || {},
+      renderBackend: theme.renderBackend === "rive" ? "rive" : "svg",
+      rive: theme.rive
+        ? {
+          file: theme.rive.file,
+          stateMachine: theme.rive.stateMachine,
+          stateMachines: [...(theme.rive.stateMachines || [])],
+          inputs: { ...(theme.rive.inputs || {}) },
+          stateLevels: { ...(theme.rive.stateLevels || {}) },
+          assetUrl: theme.rive.file && getRendererSourceAssetsPath()
+            ? `${getRendererSourceAssetsPath().replace(/\/$/, "")}/${theme.rive.file}`
+            : null,
+        }
+        : null,
     };
   }
 

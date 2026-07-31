@@ -109,7 +109,7 @@ function createThemeFadeSequencer(options = {}) {
     });
   }
 
-  function reloadAfterFade(seq, onReady, onFallback) {
+  function reloadAfterFade(seq, onReady, onFallback, options = {}) {
     if (!isCurrent(seq)) return;
     const renderWin = getRenderWindow();
     const hitWin = getHitWindow();
@@ -131,7 +131,13 @@ function createThemeFadeSequencer(options = {}) {
     scheduleFadeFallback(seq, onFallback);
 
     try {
-      renderContents.reload();
+      // Backend switch (SVG ↔ Rive): loadFile different HTML so CSP/entry match.
+      // Same-backend theme switch: keep reload() (cheaper, preserves entry).
+      if (typeof options.renderLoadFilePath === "string" && options.renderLoadFilePath) {
+        renderContents.loadFile(options.renderLoadFilePath);
+      } else {
+        renderContents.reload();
+      }
       hitContents.reload();
     } catch {
       if (typeof onFallback === "function") onFallback();
@@ -168,7 +174,9 @@ function createThemeFadeSequencer(options = {}) {
 
     animateOpacity(seq, 0, fadeOutMs).then(() => {
       if (!isCurrent(seq) || settled) return;
-      reloadAfterFade(seq, onReady, () => finish("fallback"));
+      reloadAfterFade(seq, onReady, () => finish("fallback"), {
+        renderLoadFilePath: callbacks.renderLoadFilePath || null,
+      });
     });
 
     return seq;

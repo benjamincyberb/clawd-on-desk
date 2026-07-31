@@ -44,6 +44,23 @@ const RECENT_MOUSE_MS = 2000;
 const POINTER_BRIDGE_STATES = new Set(["idle", "mini-idle", "mini-peek"]);
 const LOW_POWER_PAUSE_STATES = new Set(["idle", "mini-idle", "dozing"]);
 const POINTER_BRIDGE_EPSILON = 0.001;
+// Cursor streaming for Pixi/Rive spikes and theme-selected Rive backends.
+function resolveSpikeRenderBackend() {
+  const explicit = String(process.env.CLAWD_RENDER_BACKEND || "").trim().toLowerCase();
+  if (explicit === "svg" || explicit === "pixi" || explicit === "rive") return explicit;
+  if (process.env.CLAWD_RIVE_SPIKE === "1") return "rive";
+  if (process.env.CLAWD_PIXI_SPIKE === "1") return "pixi";
+  return "svg";
+}
+function needsSpikeCursor() {
+  const backend = resolveSpikeRenderBackend();
+  if (backend === "pixi" || backend === "rive") return true;
+  if (typeof ctx.getRenderBackend === "function") {
+    const themeBackend = ctx.getRenderBackend();
+    return themeBackend === "rive" || themeBackend === "pixi";
+  }
+  return false;
+}
 
 // ── Theme-driven state (refreshed on hot theme switch) ──
 let theme = null;
@@ -216,7 +233,8 @@ function runMainTickOnce() {
 
     // Skip expensive native IPC calls (getCursorScreenPoint, getBounds) when
     // cursor tracking is not needed — saves ~20 calls/sec to the OS layer.
-    const needsCursorPoll = idleNow || miniIdleNow || ctx.miniMode || roamNow;
+    const spikeCursor = needsSpikeCursor();
+    const needsCursorPoll = idleNow || miniIdleNow || ctx.miniMode || roamNow || spikeCursor;
     if (!needsCursorPoll) return nextDelay();
 
     const cursor = screen.getCursorScreenPoint();
@@ -230,12 +248,21 @@ function runMainTickOnce() {
     const needsPointerBridgeBounds = !!pointerBridgeKey
       && !suppressPassiveIpc
       && (moved || ctx.forceEyeResend || pointerBridgeKey !== lastPointerBridgeKey);
-    const needsBounds = ctx.miniMode || moved || ctx.forceEyeResend || miniIdleNow || needsPointerBridgeBounds;
+    const needsBounds = ctx.miniMode || moved || ctx.forceEyeResend || miniIdleNow
+      || needsPointerBridgeBounds || spikeCursor;
     let bounds = null;
     if (needsBounds) {
       bounds = typeof ctx.getPetWindowBounds === "function"
         ? ctx.getPetWindowBounds()
         : ctx.win.getBounds();
+    }
+    // Pixi / Rive: map global cursor → pet-window local CSS pixels.
+    // Channel name stays "pixi-cursor" so preload IPC surface stays unchanged.
+    if (spikeCursor && bounds && !suppressPassiveIpc) {
+      ctx.sendToRenderer("pixi-cursor", {
+        x: cursor.x - bounds.x,
+        y: cursor.y - bounds.y,
+      });
     }
     if (bounds && !ctx.dragLocked) {
       const hit = ctx.getHitRectScreen(bounds);

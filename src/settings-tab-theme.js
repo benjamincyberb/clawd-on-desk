@@ -188,6 +188,7 @@
     if (caps.meritCultivator && caps.meritCultivator.enabled) {
       badges.push(t("themeCapabilityMerit"));
     }
+    if (caps.renderBackend === "rive") badges.push(t("themeCapabilityRive"));
     return badges;
   }
 
@@ -1046,8 +1047,12 @@
   function formatUserThemeZipImportOk(result) {
     const formatter = t("toastUserThemeZipImportOk");
     const name = localizeField(result && result.name) || (result && result.themeId) || "theme";
-    if (typeof formatter === "function") return formatter(name);
-    return String(formatter);
+    let message = typeof formatter === "function" ? formatter(name) : String(formatter);
+    if (result && (result.rive || result.renderBackend === "rive")) {
+      const warn = t("toastUserThemeZipImportRiveWarning");
+      if (warn) message = `${message} ${warn}`;
+    }
+    return message;
   }
 
   function formatUserThemeZipImportFailed(message) {
