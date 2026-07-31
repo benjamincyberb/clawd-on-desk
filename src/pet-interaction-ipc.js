@@ -66,6 +66,11 @@ function registerPetInteractionIpc(options = {}) {
   const statPath = requiredDependency(options.statPath, "statPath");
   const openTerminalAt = requiredDependency(options.openTerminalAt, "openTerminalAt");
   const dropLog = options.dropLog || (() => {});
+  const applySizeEditResize = options.applySizeEditResize || (() => {});
+  const endSizeEditResizeGesture = options.endSizeEditResizeGesture || (() => {});
+  const commitSizeEdit = options.commitSizeEdit || (() => {});
+  const cancelSizeEdit = options.cancelSizeEdit || (() => {});
+  const syncSizeEditOverlayIfActive = options.syncSizeEditOverlayIfActive || (() => {});
   const isMacPlatform = options.isMacPlatform != null
     ? !!options.isMacPlatform
     : process.platform === "darwin";
@@ -77,8 +82,15 @@ function registerPetInteractionIpc(options = {}) {
   }
 
   on("show-context-menu", showContextMenu);
-  on("drag-move", () => moveWindowForDrag());
+  on("drag-move", () => {
+    moveWindowForDrag();
+    syncSizeEditOverlayIfActive();
+  });
   on("pet-visual-ready", (event) => recoverVisiblePetAfterRendererLoad(event));
+  on("pet-size-edit:resize", (_event, payload) => applySizeEditResize(payload || {}));
+  on("pet-size-edit:resize-end", () => endSizeEditResizeGesture());
+  on("pet-size-edit:commit", () => commitSizeEdit());
+  on("pet-size-edit:cancel", () => cancelSizeEdit());
 
   on("pause-cursor-polling", () => {
     setIdlePaused(true);
@@ -129,6 +141,7 @@ function registerPetInteractionIpc(options = {}) {
           scheduleHwndRecovery();
           syncHitWin();
           repositionFloatingBubbles();
+          syncSizeEditOverlayIfActive();
         }
       }
     } finally {
@@ -139,6 +152,7 @@ function registerPetInteractionIpc(options = {}) {
       // a drag-end without a paired drag-lock(false) can't strand the deferred
       // click-through write.
       syncImeEditingPetDodge();
+      syncSizeEditOverlayIfActive();
     }
   });
 

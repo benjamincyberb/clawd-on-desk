@@ -43,4 +43,10 @@ contextBridge.exposeInMainWorld("hitAPI", {
   // State sync ← main
   onStateSync: (cb) => ipcRenderer.on("hit-state-sync", (_, data) => cb(data)),
   onCancelReaction: (cb) => ipcRenderer.on("hit-cancel-reaction", () => cb()),
+  // Corner-drag resize mode (work-area modal overlay)
+  onSizeEdit: (cb) => ipcRenderer.on("hit-size-edit", (_, data) => cb(data)),
+  sizeEditResize: (payload) => ipcRenderer.send("pet-size-edit:resize", payload),
+  sizeEditResizeEnd: () => ipcRenderer.send("pet-size-edit:resize-end"),
+  sizeEditCommit: () => ipcRenderer.send("pet-size-edit:commit"),
+  sizeEditCancel: () => ipcRenderer.send("pet-size-edit:cancel"),
 });

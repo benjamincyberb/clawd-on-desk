@@ -166,6 +166,10 @@ function createPetWindowRuntime(options = {}) {
     getMiniPeekOffset,
   });
 
+  const isSizeEditMode = typeof options.isSizeEditMode === "function"
+    ? options.isSizeEditMode
+    : () => false;
+
   let viewportOffsetY = 0;
   let petHidden = false;
   let dragLocked = false;
@@ -606,6 +610,9 @@ function createPetWindowRuntime(options = {}) {
     // Keep the captured pointer stable while dragging. Repositioning the input
     // window mid-drag can break pointer capture on Windows.
     if (dragLocked) return;
+    // Corner-drag resize mode expands hitWin into a work-area modal overlay;
+    // periodic sync must not shrink it back to the pet hitbox mid-edit.
+    if (isSizeEditMode()) return;
     const bounds = getPetWindowBounds();
     const hit = getHitRectScreen(bounds);
     if (!hit) return;

@@ -131,6 +131,13 @@ const {
   getLaunchSizingWorkArea,
   getProportionalPixelSize,
 } = require("./size-utils");
+const {
+  computeResizeBounds,
+  boundsToSizeKey,
+  SIZE_RATIO_MIN,
+  SIZE_RATIO_MAX,
+} = require("./pet-size-resize");
+const SIZE_EDIT_HANDLE_PX = 14;
 const { keepOutOfTaskbar } = require("./taskbar");
 const { loadTrayNormalIcon, loadTrayFlashIcon } = require("./tray-flash-icon");
 const createTopmostRuntime = require("./topmost-runtime");
@@ -842,6 +849,12 @@ if (_loadedStartupTheme._id !== _requestedThemeId || _loadedStartupTheme._varian
 }
 
 // ── Pet window geometry / bounds runtime ──
+let sizeEditMode = false;
+let sizeEditStartBounds = null;
+let sizeEditWorkArea = null;
+let sizeEditGestureStartBounds = null;
+let sizeEditEscapeRegistered = false;
+
 const petWindowRuntime = createPetWindowRuntime({
   screen,
   isWin,
@@ -865,6 +878,7 @@ const petWindowRuntime = createPetWindowRuntime({
   getKeepSizeAcrossDisplays: () => keepSizeAcrossDisplaysCached,
   getAllowEdgePinning: () => allowEdgePinningCached,
   isProportionalMode: () => isProportionalMode(),
+  isSizeEditMode: () => sizeEditMode,
   getPrimaryWorkAreaSafe: () => getPrimaryWorkAreaSafe(),
   getNearestWorkArea,
   sendToRenderer,
@@ -3341,6 +3355,176 @@ function showResumeInput(t) {
   });
 }
 
+function cloneBounds(bounds) {
+  if (!bounds) return null;
+  return {
+    x: Number(bounds.x) || 0,
+    y: Number(bounds.y) || 0,
+    width: Number(bounds.width) || 0,
+    height: Number(bounds.height) || 0,
+  };
+}
+
+function getSizeEditPetRectClient(workArea = sizeEditWorkArea) {
+  if (!workArea) return null;
+  const pet = getPetWindowBounds();
+  if (!pet) return null;
+  return {
+    left: pet.x - workArea.x,
+    top: pet.y - workArea.y,
+    width: pet.width,
+    height: pet.height,
+  };
+}
+
+function pushSizeEditHitOverlay() {
+  if (!sizeEditMode) return;
+  const petRectClient = getSizeEditPetRectClient();
+  if (!petRectClient) return;
+  sendToHitWin("hit-size-edit", {
+    active: true,
+    petRectClient,
+    handleSize: SIZE_EDIT_HANDLE_PX,
+    minRatio: SIZE_RATIO_MIN,
+    maxRatio: SIZE_RATIO_MAX,
+    labels: {
+      confirm: translate("confirm"),
+      cancel: translate("cancel"),
+    },
+  });
+}
+
+function expandHitWinToWorkArea(workArea) {
+  if (!hitWin || hitWin.isDestroyed() || !workArea) return;
+  const x = Math.round(workArea.x);
+  const y = Math.round(workArea.y);
+  const w = Math.max(1, Math.round(workArea.width));
+  const h = Math.max(1, Math.round(workArea.height));
+  hitWin.setBounds({ x, y, width: w, height: h });
+  if (typeof hitWin.setShape === "function") {
+    hitWin.setShape([{ x: 0, y: 0, width: w, height: h }]);
+  }
+}
+
+function registerSizeEditEscape() {
+  if (sizeEditEscapeRegistered) return;
+  try {
+    sizeEditEscapeRegistered = !!globalShortcut.register("Escape", () => {
+      cancelSizeEdit();
+    });
+  } catch {
+    sizeEditEscapeRegistered = false;
+  }
+}
+
+function unregisterSizeEditEscape() {
+  if (!sizeEditEscapeRegistered) return;
+  try { globalShortcut.unregister("Escape"); } catch {}
+  sizeEditEscapeRegistered = false;
+}
+
+function enterSizeEditMode() {
+  if (sizeEditMode) return;
+  if (!win || win.isDestroyed()) return;
+  if (_mini.getMiniMode() || _mini.getMiniTransitioning()) return;
+  if (petWindowRuntime.isPetHidden()) return;
+
+  const bounds = cloneBounds(getPetWindowBounds());
+  if (!bounds || !(bounds.width > 0) || !(bounds.height > 0)) return;
+  let workArea = getNearestWorkArea(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  if (!workArea) workArea = getPrimaryWorkAreaSafe() || SYNTHETIC_WORK_AREA;
+
+  sizeEditMode = true;
+  sizeEditStartBounds = bounds;
+  sizeEditWorkArea = {
+    x: Number(workArea.x) || 0,
+    y: Number(workArea.y) || 0,
+    width: Number(workArea.width) || 0,
+    height: Number(workArea.height) || 0,
+  };
+  sizeEditGestureStartBounds = null;
+
+  expandHitWinToWorkArea(sizeEditWorkArea);
+  sendToRenderer("size-edit-mode", { active: true, handleSize: SIZE_EDIT_HANDLE_PX });
+  pushSizeEditHitOverlay();
+  registerSizeEditEscape();
+}
+
+function applySizeEditResize(payload = {}) {
+  if (!sizeEditMode) return;
+  const corner = payload && payload.corner;
+  const screenX = Number(payload && payload.screenX);
+  const screenY = Number(payload && payload.screenY);
+  if (payload && payload.begin) {
+    sizeEditGestureStartBounds = cloneBounds(getPetWindowBounds());
+  }
+  if (!sizeEditGestureStartBounds) {
+    sizeEditGestureStartBounds = cloneBounds(getPetWindowBounds());
+  }
+  const next = computeResizeBounds({
+    corner,
+    cursorScreenX: screenX,
+    cursorScreenY: screenY,
+    startBounds: sizeEditGestureStartBounds,
+    workArea: sizeEditWorkArea,
+    minRatio: SIZE_RATIO_MIN,
+    maxRatio: SIZE_RATIO_MAX,
+  });
+  if (!next) return;
+  applyPetWindowBounds(next);
+  pushSizeEditHitOverlay();
+  repositionFloatingBubbles();
+}
+
+function endSizeEditResizeGesture() {
+  sizeEditGestureStartBounds = null;
+}
+
+function exitSizeEditMode() {
+  if (!sizeEditMode && !sizeEditEscapeRegistered) return;
+  sizeEditMode = false;
+  sizeEditStartBounds = null;
+  sizeEditWorkArea = null;
+  sizeEditGestureStartBounds = null;
+  unregisterSizeEditEscape();
+  try { sendToRenderer("size-edit-mode", { active: false }); } catch {}
+  try { sendToHitWin("hit-size-edit", { active: false }); } catch {}
+  try { syncHitWin(); } catch {}
+  try { repositionFloatingBubbles(); } catch {}
+}
+
+function commitSizeEdit() {
+  if (!sizeEditMode) return;
+  const bounds = getPetWindowBounds();
+  const workArea = sizeEditWorkArea;
+  const key = bounds && workArea
+    ? boundsToSizeKey(bounds.width, workArea)
+    : null;
+  exitSizeEditMode();
+  if (key) {
+    try { _settingsController.applyCommand("resizePet", key); } catch {}
+  }
+}
+
+function cancelSizeEdit() {
+  if (!sizeEditMode) return;
+  const restore = sizeEditStartBounds ? cloneBounds(sizeEditStartBounds) : null;
+  exitSizeEditMode();
+  if (restore) {
+    try { applyPetWindowBounds(restore); } catch {}
+    try { syncHitWin(); } catch {}
+    try { repositionFloatingBubbles(); } catch {}
+  }
+}
+
+function syncSizeEditOverlayIfActive() {
+  if (!sizeEditMode) return;
+  pushSizeEditHitOverlay();
+}
+
 const _menuCtx = {
   get win() { return win; },
   get sessions() { return sessions; },
@@ -3499,6 +3683,7 @@ const _menuCtx = {
   getPixelSizeFor,
   isProportionalMode,
   PROPORTIONAL_RATIOS,
+  enterSizeEditMode: () => enterSizeEditMode(),
   getHookServerPort: () => getHookServerPort(),
   clampToScreenVisual,
   getNearestWorkArea,
@@ -4028,6 +4213,11 @@ function createWindow() {
     statPath: (p) => fs.promises.stat(p),
     openTerminalAt: (dir) => openTerminalAt(dir),
     dropLog: (message) => console.log(`Clawd: ${message}`),
+    applySizeEditResize: (payload) => applySizeEditResize(payload),
+    endSizeEditResizeGesture: () => endSizeEditResizeGesture(),
+    commitSizeEdit: () => commitSizeEdit(),
+    cancelSizeEdit: () => cancelSizeEdit(),
+    syncSizeEditOverlayIfActive: () => syncSizeEditOverlayIfActive(),
   });
 
   registerPermissionIpc({
@@ -4577,6 +4767,9 @@ if (!gotTheLock) {
     if (meritBridge) {
       try { meritBridge.cleanup(); } catch {}
     }
+    // Discard in-progress corner-drag preview before flushing prefs so we do
+    // not persist a transient pixel size against the previous size key.
+    try { cancelSizeEdit(); } catch {}
     flushRuntimeStateToPrefs();
     globalShortcut.unregisterAll();
     void settingsSizePreviewSession.cleanup();

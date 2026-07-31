@@ -529,6 +529,18 @@ module.exports = function initMenu(ctx) {
       });
     }
 
+    // Size group: enter corner-drag resize mode (dashed frame + handles).
+    // Hidden in mini mode like send-to-display.
+    const sizeGroup = [];
+    if (!ctx.getMiniMode()) {
+      sizeGroup.push({
+        label: t("menuSizeAdjust"),
+        click: () => {
+          if (typeof ctx.enterSizeEditMode === "function") ctx.enterSizeEditMode();
+        },
+      });
+    }
+
     const appGroup = [
       {
         label: t("settings"),
@@ -553,7 +565,7 @@ module.exports = function initMenu(ctx) {
       { label: t("quit"), click: () => requestAppQuit() },
     ];
 
-    const template = joinGroups([stateGroup, workGroup, displayGroup, appGroup, quitGroup]);
+    const template = joinGroups([stateGroup, workGroup, displayGroup, sizeGroup, appGroup, quitGroup]);
     ctx.contextMenu = Menu.buildFromTemplate(template);
   }
 

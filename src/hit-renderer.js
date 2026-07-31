@@ -30,10 +30,144 @@ window.hitAPI.onStateSync((data) => {
   if (data.currentState !== undefined) currentState = data.currentState;
   if (data.miniMode !== undefined) {
     miniMode = data.miniMode;
-    area.style.cursor = miniMode ? "default" : "";
+    if (!sizeEditActive) area.style.cursor = miniMode ? "default" : "";
   }
   if (data.dndEnabled !== undefined) dndEnabled = data.dndEnabled;
 });
+
+// --- Size-edit mode (work-area modal: drag corners / move pet / Confirm·Cancel) ---
+let sizeEditActive = false;
+let sizeEditPetRect = null;
+let sizeEditHandleSize = 14;
+let sizeEditCorner = null;
+let sizeEditResizing = false;
+const sizeEditActions = document.getElementById("size-edit-actions");
+const sizeEditConfirmBtn = document.getElementById("size-edit-confirm");
+const sizeEditCancelBtn = document.getElementById("size-edit-cancel");
+const SIZE_EDIT_ACTIONS_GAP = 10;
+
+function pointInRect(x, y, rect, pad = 0) {
+  if (!rect) return false;
+  return x >= rect.left - pad
+    && y >= rect.top - pad
+    && x <= rect.left + rect.width + pad
+    && y <= rect.top + rect.height + pad;
+}
+
+function hitTestSizeEditCorner(x, y) {
+  if (!sizeEditPetRect) return null;
+  const half = Math.max(8, sizeEditHandleSize) / 2 + 4;
+  const corners = {
+    nw: { x: sizeEditPetRect.left, y: sizeEditPetRect.top },
+    ne: { x: sizeEditPetRect.left + sizeEditPetRect.width, y: sizeEditPetRect.top },
+    sw: { x: sizeEditPetRect.left, y: sizeEditPetRect.top + sizeEditPetRect.height },
+    se: {
+      x: sizeEditPetRect.left + sizeEditPetRect.width,
+      y: sizeEditPetRect.top + sizeEditPetRect.height,
+    },
+  };
+  for (const name of ["nw", "ne", "sw", "se"]) {
+    const c = corners[name];
+    if (Math.abs(x - c.x) <= half && Math.abs(y - c.y) <= half) return name;
+  }
+  return null;
+}
+
+function cursorForSizeEditCorner(corner) {
+  if (corner === "nw" || corner === "se") return "nwse-resize";
+  if (corner === "ne" || corner === "sw") return "nesw-resize";
+  return "default";
+}
+
+function layoutSizeEditActions() {
+  if (!sizeEditActions || !sizeEditPetRect) return;
+  // Measure after making visible so offsetWidth is correct.
+  const barW = sizeEditActions.offsetWidth || 160;
+  const barH = sizeEditActions.offsetHeight || 30;
+  const left = Math.round(
+    sizeEditPetRect.left + (sizeEditPetRect.width - barW) / 2,
+  );
+  let top = Math.round(
+    sizeEditPetRect.top + sizeEditPetRect.height + SIZE_EDIT_ACTIONS_GAP,
+  );
+  // Keep the bar inside the hit window when the pet sits near the bottom.
+  const maxTop = Math.max(0, window.innerHeight - barH - 8);
+  if (top > maxTop) {
+    top = Math.max(8, Math.round(sizeEditPetRect.top - barH - SIZE_EDIT_ACTIONS_GAP));
+  }
+  sizeEditActions.style.left = `${Math.max(8, left)}px`;
+  sizeEditActions.style.top = `${top}px`;
+}
+
+function showSizeEditActions(labels) {
+  if (!sizeEditActions || !sizeEditConfirmBtn || !sizeEditCancelBtn) return;
+  sizeEditConfirmBtn.textContent = (labels && labels.confirm) || "Confirm";
+  sizeEditCancelBtn.textContent = (labels && labels.cancel) || "Cancel";
+  sizeEditActions.classList.add("visible");
+  sizeEditActions.setAttribute("aria-hidden", "false");
+  layoutSizeEditActions();
+}
+
+function hideSizeEditActions() {
+  if (!sizeEditActions) return;
+  sizeEditActions.classList.remove("visible");
+  sizeEditActions.setAttribute("aria-hidden", "true");
+}
+
+function updateSizeEditHoverCursor(clientX, clientY) {
+  if (!sizeEditActive || sizeEditResizing || isDragging) return;
+  const corner = hitTestSizeEditCorner(clientX, clientY);
+  if (corner) {
+    area.style.cursor = cursorForSizeEditCorner(corner);
+    return;
+  }
+  if (pointInRect(clientX, clientY, sizeEditPetRect)) {
+    area.style.cursor = "grab";
+    return;
+  }
+  area.style.cursor = "default";
+}
+
+if (window.hitAPI && typeof window.hitAPI.onSizeEdit === "function") {
+  window.hitAPI.onSizeEdit((data) => {
+    const active = !!(data && data.active);
+    sizeEditActive = active;
+    if (!active) {
+      sizeEditPetRect = null;
+      sizeEditCorner = null;
+      sizeEditResizing = false;
+      hideSizeEditActions();
+      area.style.cursor = miniMode ? "default" : "";
+      return;
+    }
+    if (data.petRectClient) sizeEditPetRect = data.petRectClient;
+    if (Number.isFinite(data.handleSize)) sizeEditHandleSize = data.handleSize;
+    showSizeEditActions(data.labels);
+  });
+}
+
+if (sizeEditConfirmBtn) {
+  sizeEditConfirmBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!sizeEditActive) return;
+    window.hitAPI.sizeEditCommit();
+  });
+}
+if (sizeEditCancelBtn) {
+  sizeEditCancelBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!sizeEditActive) return;
+    window.hitAPI.sizeEditCancel();
+  });
+}
+// Don't let button presses fall through into drag / outside-click logic.
+if (sizeEditActions) {
+  sizeEditActions.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+  });
+}
 
 // --- Drag state ---
 let isDragging = false;
@@ -73,36 +207,83 @@ function clearQueuedDragMove() {
 
 // --- Pointer handlers ---
 area.addEventListener("pointerdown", (e) => {
-  if (e.button === 0) {
-    if (miniMode) { didDrag = false; return; }
-    area.setPointerCapture(e.pointerId);
-    isDragging = true;
-    didDrag = false;
-    mouseDownX = e.clientX;
-    mouseDownY = e.clientY;
-    lastDragClientX = e.clientX;
-    dragReactionDirection = null;
-    window.hitAPI.dragLock(true);
-    area.classList.add("dragging");
+  if (e.button !== 0) return;
+
+  if (sizeEditActive) {
+    const corner = hitTestSizeEditCorner(e.clientX, e.clientY);
+    if (corner) {
+      area.setPointerCapture(e.pointerId);
+      sizeEditResizing = true;
+      sizeEditCorner = corner;
+      didDrag = false;
+      area.style.cursor = cursorForSizeEditCorner(corner);
+      window.hitAPI.sizeEditResize({
+        corner,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        begin: true,
+      });
+      return;
+    }
+    if (pointInRect(e.clientX, e.clientY, sizeEditPetRect)) {
+      // Move the pet while staying in size-edit mode (no click reactions).
+      area.setPointerCapture(e.pointerId);
+      isDragging = true;
+      didDrag = false;
+      mouseDownX = e.clientX;
+      mouseDownY = e.clientY;
+      lastDragClientX = e.clientX;
+      dragReactionDirection = null;
+      window.hitAPI.dragLock(true);
+      area.classList.add("dragging");
+      area.style.cursor = "grabbing";
+      return;
+    }
+    // Outside the pet: keep size-edit mode; Confirm / Cancel / Esc exit.
+    return;
   }
+
+  if (miniMode) { didDrag = false; return; }
+  area.setPointerCapture(e.pointerId);
+  isDragging = true;
+  didDrag = false;
+  mouseDownX = e.clientX;
+  mouseDownY = e.clientY;
+  lastDragClientX = e.clientX;
+  dragReactionDirection = null;
+  window.hitAPI.dragLock(true);
+  area.classList.add("dragging");
 });
 
 document.addEventListener("pointermove", (e) => {
+  if (sizeEditResizing && sizeEditCorner) {
+    window.hitAPI.sizeEditResize({
+      corner: sizeEditCorner,
+      screenX: e.screenX,
+      screenY: e.screenY,
+      begin: false,
+    });
+    return;
+  }
   if (isDragging) {
     if (!didDrag) {
       const totalDx = e.clientX - mouseDownX;
       const totalDy = e.clientY - mouseDownY;
       if (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD) {
         didDrag = true;
-        startDragReaction(totalDx < 0 ? "left" : (totalDx > 0 ? "right" : null));
+        if (!sizeEditActive) {
+          startDragReaction(totalDx < 0 ? "left" : (totalDx > 0 ? "right" : null));
+        }
       }
-    } else {
+    } else if (!sizeEditActive) {
       const stepDx = e.clientX - lastDragClientX;
       if (stepDx !== 0) startDragReaction(stepDx < 0 ? "left" : "right");
     }
     lastDragClientX = e.clientX;
     queueDragMove();
+    return;
   }
+  if (sizeEditActive) updateSizeEditHoverCursor(e.clientX, e.clientY);
 });
 
 function stopDrag() {
@@ -115,13 +296,29 @@ function stopDrag() {
     window.hitAPI.dragEnd();
   }
   endDragReaction();
+  if (sizeEditActive) updateSizeEditHoverCursor(mouseDownX, mouseDownY);
+}
+
+function stopSizeEditResize() {
+  if (!sizeEditResizing) return;
+  sizeEditResizing = false;
+  sizeEditCorner = null;
+  if (window.hitAPI.sizeEditResizeEnd) window.hitAPI.sizeEditResizeEnd();
+  if (sizeEditActive) area.style.cursor = "default";
 }
 
 document.addEventListener("pointerup", (e) => {
   if (e.button !== 0) return;
+
+  if (sizeEditResizing) {
+    stopSizeEditResize();
+    return;
+  }
+
   const wasDrag = didDrag;
   stopDrag();
   if (wasDrag) return;
+  if (sizeEditActive) return;
 
   // macOS Ctrl-click is the system right-click gesture. Let the OS / our
   // contextmenu handler deal with it; do NOT treat it as the Dashboard
@@ -143,9 +340,26 @@ document.addEventListener("pointerup", (e) => {
   handleClick(e.clientX);
 });
 
-area.addEventListener("pointercancel", () => stopDrag());
-area.addEventListener("lostpointercapture", () => { if (isDragging) stopDrag(); });
-window.addEventListener("blur", stopDrag);
+area.addEventListener("pointercancel", () => {
+  stopSizeEditResize();
+  stopDrag();
+});
+area.addEventListener("lostpointercapture", () => {
+  if (sizeEditResizing) stopSizeEditResize();
+  if (isDragging) stopDrag();
+});
+window.addEventListener("blur", () => {
+  stopSizeEditResize();
+  stopDrag();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (!sizeEditActive) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    window.hitAPI.sizeEditCancel();
+  }
+});
 
 // --- Click reaction logic (2-click = poke, 4-click = flail) ---
 const CLICK_WINDOW_MS = 400;
@@ -312,5 +526,6 @@ if (!isMac) {
 // --- Right-click context menu ---
 document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
+  if (sizeEditActive) return;
   window.hitAPI.showContextMenu();
 });

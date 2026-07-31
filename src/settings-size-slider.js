@@ -221,6 +221,7 @@ return {
   prefsSizeToUi,
   clampSizeUi,
   sizeUiToPct,
+  formatSizeKey,
   getSizeSliderAnchorPx,
   createSizeSliderController,
 };

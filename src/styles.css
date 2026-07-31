@@ -38,6 +38,35 @@ html, body {
   cursor: grabbing;
 }
 
+/* Corner-drag resize mode overlay (also injected by size-edit-overlay.js for
+   Pixi / Rive entry HTML that does not load this stylesheet). */
+.size-edit-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  border: 2px dashed rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.size-edit-frame .size-edit-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  background: rgba(40, 120, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.size-edit-frame .size-edit-handle-nw { left: 0; top: 0; }
+.size-edit-frame .size-edit-handle-ne { right: 0; top: 0; }
+.size-edit-frame .size-edit-handle-sw { left: 0; bottom: 0; }
+.size-edit-frame .size-edit-handle-se { right: 0; bottom: 0; }
+
 #pet-facing-stage,
 #pet-motion-stage,
 #pet-asset-direction-stage,
