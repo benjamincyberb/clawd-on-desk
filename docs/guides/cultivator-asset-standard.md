@@ -1,6 +1,6 @@
 # 功德桌宠素材标准（Spec / 对外规范）
 
-> **Spec 版本：`1.0.0`** ｜ 最后更新：2026-07 ｜ 语义化版本，破坏性改动升 major。
+> **Spec 版本：`1.1.2`** ｜ 最后更新：2026-07 ｜ 语义化版本，破坏性改动升 major。
 > 变更记录见文末「附录 A：变更记录」。
 >
 > **规范用词（RFC 2119 风格）**：**MUST / 必须**＝硬性，违反即判不合格；**SHOULD / 应**＝强烈建议，
@@ -22,7 +22,7 @@
 >
 > | 文档 | 状态 | 说明 |
 > |------|------|------|
-> | `cultivator-asset-standard.md` | **现行权威** | 素材硬标准 + 对外规范 Spec `1.0.0` |
+> | `cultivator-asset-standard.md` | **现行权威** | 素材硬标准 + 对外规范 Spec `1.1.2` |
 > | `cultivator-asset-pipeline.md` | **现行** | 操作手册；内含「废弃脚本」提示，文档本身未废弃 |
 > | `cultivator-asset-lessons.md` | **现行** | 经验复盘；不钉数值，改数值以 standard 为准 |
 > | `guide-theme-creation.md` | **现行** | 通用主题作者指南；`meritCultivator` 仅 builtin |
@@ -31,7 +31,7 @@
 >
 > 约束真相源始终是代码常量（`scripts/generate-cultivator-ai-assets.js` 的
 > `REF_STYLE` / `STAGE_PROMPTS` / `FORBIDDEN_FX*` / `KNOCK_FRAME_SEQUENCE`，
-> `scripts/embed-cultivator-ai-svgs.js` 的 `KNOCK_FX_TIER`（以及已废弃的 `KNOCK_LAYOUT` 分层路径），
+> `scripts/embed-cultivator-ai-svgs.js` 的 `KNOCK_FX_TIER` / `IDLE_AURA_TIER`（以及已废弃的 `KNOCK_LAYOUT` 分层路径），
 > `assets/source/cultivator/manifest.json`）。**改标准 = 改这些常量 + 同步本页。**
 
 ---
@@ -89,7 +89,7 @@
 | `layout.centerX` | `8` | 水平锚 |
 | `layout.baselineY` | `20` | 坐/站基线 |
 | `layout.visibleHeightRatio` | `0.62` | 可见身体占窗口高度比 |
-| `layout.baselineBottomRatio` | `0.06` | 基线到窗口底距离比 |
+| `layout.baselineBottomRatio` | `0.18` | 基线到窗口底距离比（高阶 idle 坐底/莲台接近画布底，过小会裁切腿部） |
 | `hitBoxes.default` | `{ x: 0, y: 2, w: 16, h: 16 }` | 常规命中框 |
 | `hitBoxes.sleeping` | `{ x: 0, y: 6, w: 16, h: 12 }` | 睡眠命中框 |
 
@@ -117,13 +117,27 @@
 |------|--------|
 | 可复用祥云环 `fx/cloud-scrolls.png` | AI 生 1024² → **嵌入前降采样到 ~384²**；必须 chroma-key |
 | 单张 working SVG 因云环带来的体积增量 | **≲ 0.3 MB** |
-| 佛光 / 软光晕 / 莲瓣 | **不出素材**，全部程序化 SVG（`radialGradient` + CSS） |
+| 佛光 / 软光晕 / 莲瓣 | **不出素材**，全部程序化 SVG（`radialGradient` + CSS / SMIL） |
+| idle 功德结界 motif（草/香/烛/经文） | **不出素材**，全部程序化 SVG + **SMIL**（见 §2.4 / §9） |
 
-### 2.4 运行时动画时序（SVG + CSS，硬性）
+### 2.4 运行时动画时序（SVG + CSS / SMIL，硬性）
 
 - 6 帧堆叠，用 **linear + 整点百分比硬切 `opacity`**（`0 / 16.67 / … / 100%`）。**禁止 `step-end`**（尾帧空帧/闪烁）。
 - 敲击周期 **1.4s**；离屏冻帧自查在 `currentTime = 756ms`（绽放峰值附近）截图核对佛光 + 云环是否读得出。
-- 常驻气场（佛光呼吸、云环自转）在 idle+working 用**完全相同的 CSS**，状态切换不闪跳；事件爆发（敲中绽放、莲瓣飞散）只在 working。
+- working 事件爆发（敲中绽放、莲瓣飞散）只在 working；敲击态的常驻佛光仍用 CSS（object 通道 / 与 idle 共享 `haloMarkup` 几何）。
+- **idle「功德结界」**（`IDLE_AURA_TIER` + `idleAuraMarkup`）：本体不动，周围叠加随境界**质变**的环境气场。动效 **MUST 用 SMIL**（`<animate>` / `<animateTransform>`）——cultivator idle 走 `<img>` 通道，SVG 内 CSS `@keyframes` **不播放**。可同时保留 CSS 供 object 通道 preview/petdex。
+- idle 结界六境 motif（单调递增，改表 = 升 Spec）：
+
+| 阶段 | idle 结界标志 |
+|------|----------------|
+| `mortal` | 凡尘扬起（放大微尘；禁止程序几何宠物 / 草丛 / 蒲团） |
+| `adept` | 线香青烟 + 极淡微尘 |
+| `novice` | 佛光呼吸（SMIL）+ 烛火微闪 |
+| `arhat` | 佛光（含 rim）+ 飘动经文 — **无祥云 / 无莲瓣** |
+| `bodhisattva` | 祥云慢转 + 旋绕莲瓣 — **无软佛光**（背后专属祥云） |
+| `buddha` | 极乐 bloom + 天降漂浮莲瓣 — **无祥云环**（PNG 已烤 mandorla） |
+
+- 结界验收：`assets/source/cultivator/idle-aura-img-qa.html`（**必须用 `<img>` 加载**）在真实浏览器核对；Cursor 内置查看器不渲染 SVG 动画。
 
 ---
 
@@ -273,7 +287,7 @@ themes/cultivator/assets/                  # 嵌入后的运行时 SVG（产物�
 
 | 运行时 state | 来源 | 素材 / 说明 |
 |--------------|------|-------------|
-| `idle` | AI | `{stage}-idle.svg`（由 `{stage}-idle.png` 嵌入）；含 `#eyes-js` 时才可眼追（cultivator 当前 `eyeTracking.enabled:false`） |
+| `idle` | AI + 程序结界 | `{stage}-idle.svg`（由 `{stage}-idle.png` 嵌入）+ per-stage **功德结界** SMIL 层（`IDLE_AURA_TIER`，见 §2.4）；含 `#eyes-js` 时才可眼追（cultivator 当前 `eyeTracking.enabled:false`）。结界**不**泄漏到 thinking/attention/error/sleeping |
 | `thinking` | AI | `{stage}-thinking.svg` |
 | `working` | AI(6 帧) / idle+FX | 非 buddha：6 帧敲击；buddha：复用 idle + 代码 FX |
 | `juggling` | 复用 | 指向 `{stage}-working.svg`（多子任务同视觉） |
@@ -415,6 +429,9 @@ themes/cultivator/assets/                  # 嵌入后的运行时 SVG（产物�
 
 | Spec 版本 | 日期 | 变更 |
 |-----------|------|------|
+| `1.1.2` | 2026-07 | 高阶 idle 背后 motif 互斥：罗汉=佛光+经文，菩萨=祥云+旋绕莲瓣，佛祖=bloom+天降莲瓣；去掉三境共用祥云环。 |
+| `1.1.1` | 2026-07 | `layout.baselineBottomRatio` `0.06`→`0.18`：高阶 idle（菩萨/佛祖）坐底贴近画布底时不再被窗口裁切。 |
+| `1.1.0` | 2026-07 | idle 新增「功德结界」：`IDLE_AURA_TIER` + SMIL 驱动的 per-stage 环境气场（草/香/烛/经文/祥云/莲瓣/bloom）；明确 idle 走 `<img>` 通道时动效 MUST 用 SMIL。补充 `idle-aura-img-qa.html` 验收页。 |
 | `1.0.0` | 2026-07 | 首次成文：钉死画布/尺寸/风格/命名/FX 分层/验收容差；补齐项目功能总览、资源状态矩阵、功德参数、对外治理（版权/模板/交付清单）。标记 `merit-cultivator-prd.md` 为 DEPRECATED；澄清文档状态一览。 |
 
 ---

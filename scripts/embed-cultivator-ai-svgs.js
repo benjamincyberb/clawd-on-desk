@@ -8,7 +8,9 @@
  *   (`wrapWorkingFramesInSvg`). Body scale must match idle.
  * Working (noKnock stages, e.g. buddha):
  *   idle raster + procedural FX (`wrapNoKnockWorkingSvg`).
- * Idle / thinking / other: single raster + light CSS breathe.
+ * Idle: single raster + per-stage「功德结界」SMIL (IDLE_AURA_TIER); CSS breathe
+ *   kept for object-channel preview. Idle renders on <img> so SMIL is required.
+ * Thinking / other static: single raster + light CSS breathe.
  *
  * @deprecated Layered base+arm path (`wrapKnockLayeredSvg` / `KNOCK_LAYOUT` /
  * `readLayeredKnockAssets`) is retained only for archaeology and is NOT called
@@ -51,6 +53,33 @@ const KNOCK_FX_TIER = {
 };
 
 /**
+ * Idle「功德结界」tier — qualitative motif sets that escalate with merit.
+ * Motifs are procedural SVG + SMIL (idle renders on the <img> channel where CSS
+ * @keyframes do not play). MUST stay monotonically richer with requiredMerit.
+ *
+ * Behind-layer motifs are MUTUALLY EXCLUSIVE above novice so high realms don't
+ * share the same cloud ring / soft halo (arhat / bodhisattva / buddha looked alike).
+ *
+ *   mortal      → 凡尘 motes
+ *   adept       → incense + faint motes
+ *   novice      → soft halo + candle
+ *   arhat       → soft halo (+ rim) + sutra glyphs     — NO clouds / petals
+ *   bodhisattva → 祥云 ring + orbiting petals          — NO soft halo
+ *   buddha      → 极乐 bloom + drifting petals         — NO clouds (PNG has baked mandorla)
+ *
+ * Companion animals are NOT procedural SVG — bake into idle PNG if needed.
+ */
+const IDLE_AURA_TIER = {
+  // moteScale boosts mortal readability; higher realms stay subtler.
+  mortal: { motes: 5, moteScale: 1.7, incense: false, candle: false, halo: false, clouds: false, glyphs: 0, petals: 0, petalMode: null, bloom: false },
+  adept: { motes: 2, moteScale: 1, incense: true, candle: false, halo: false, clouds: false, glyphs: 0, petals: 0, petalMode: null, bloom: false },
+  novice: { motes: 0, moteScale: 1, incense: false, candle: true, halo: true, clouds: false, glyphs: 0, petals: 0, petalMode: null, bloom: false },
+  arhat: { motes: 0, moteScale: 1, incense: false, candle: false, halo: true, clouds: false, glyphs: 4, petals: 0, petalMode: null, bloom: false },
+  bodhisattva: { motes: 0, moteScale: 1, incense: false, candle: false, halo: false, clouds: true, glyphs: 0, petals: 5, petalMode: "orbit", bloom: false },
+  buddha: { motes: 0, moteScale: 1, incense: false, candle: false, halo: false, clouds: false, glyphs: 0, petals: 7, petalMode: "drift", bloom: true },
+};
+
+/**
  * Reusable 祥云卷纹 art layer: one AI-generated transparent gold cloud-scroll ring
  * (assets/source/cultivator/fx/cloud-scrolls.png) placed BEHIND the character and
  * bloomed (scale + fade) on the knock strike. Baking clouds into the frames breaks the
@@ -77,6 +106,10 @@ function knockFxTier(stageId) {
   return KNOCK_FX_TIER[stageId] || KNOCK_FX_TIER.mortal;
 }
 
+function idleAuraTier(stageId) {
+  return IDLE_AURA_TIER[stageId] || IDLE_AURA_TIER.mortal;
+}
+
 /** Persistent 佛光 aura present in BOTH idle and working (halo tiers only).
  *  Buddha bakes an ornate mandorla into the PNG (`bakedHalo`), so skip the soft
  *  procedural circle — stacking both looks muddy. */
@@ -88,6 +121,11 @@ function stageHasHalo(stageId) {
 /** Buddha (and any noKnock stage): working is idle art + 祥云, not 6-frame knock. */
 function stageNoKnock(stageId) {
   return !!knockFxTier(stageId).noKnock;
+}
+
+/** Idle aura shows the AI 祥云 ring as a persistent slow orbit (not knock bloom). */
+function stageIdleClouds(stageId) {
+  return !!idleAuraTier(stageId).clouds && cloudFxBase64().length > 0;
 }
 
 /** @deprecated Layered knock only — unused by embedAll. */
@@ -633,7 +671,366 @@ function wrapNoKnockWorkingSvg(stageId, pngBuffer, viewBox) {
   ].join("\n");
 }
 
+/**
+ * SMIL opacity pulse — works inside <img> (CSS @keyframes do not).
+ * values: rest;peak;rest over one cycle.
+ */
+function smilOpacityPulse(rest, peak, dur, begin = "0s") {
+  return (
+    `<animate attributeName="opacity" dur="${dur}" begin="${begin}" repeatCount="indefinite" ` +
+    `calcMode="spline" keyTimes="0;0.5;1" values="${rest};${peak};${rest}" ` +
+    `keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>`
+  );
+}
+
+/** SMIL scale pulse around a group's own center (requires transform-box via nested g). */
+function smilScalePulse(rest, peak, dur) {
+  return (
+    `<animateTransform attributeName="transform" type="scale" dur="${dur}" repeatCount="indefinite" ` +
+    `calcMode="spline" keyTimes="0;0.5;1" values="${rest};${peak};${rest}" ` +
+    `keySplines="0.4 0 0.6 1;0.4 0 0.6 1" additive="sum"/>`
+  );
+}
+
+function smilRotate(dur, from = 0, to = 360) {
+  return (
+    `<animateTransform attributeName="transform" type="rotate" dur="${dur}" repeatCount="indefinite" ` +
+    `from="${from}" to="${to}" additive="sum"/>`
+  );
+}
+
+function smilTranslateY(amp, dur, begin = "0s") {
+  return (
+    `<animateTransform attributeName="transform" type="translate" dur="${dur}" begin="${begin}" ` +
+    `repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" ` +
+    `values="0 0;0 ${(-amp).toFixed(2)};0 0" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" additive="sum"/>`
+  );
+}
+
+/** Soft radial bloom behind buddha (idle 极乐结界) — SMIL scale+opacity. */
+function idleBloomMarkup(viewBox, stageId) {
+  const aura = idleAuraTier(stageId);
+  if (!aura.bloom) return "";
+  const tier = knockFxTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.42;
+  const gid = `idle-bloom-${stageId}`;
+  return [
+    `<g id="cult-idle-bloom" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`,
+    `  <defs><radialGradient id="${gid}" cx="50%" cy="50%" r="50%">`,
+    `    <stop offset="0%" stop-color="${tier.palette[2]}" stop-opacity="0.95"/>`,
+    `    <stop offset="45%" stop-color="${tier.palette[0]}" stop-opacity="0.45"/>`,
+    `    <stop offset="100%" stop-color="${tier.palette[0]}" stop-opacity="0"/>`,
+    `  </radialGradient></defs>`,
+    `  <g>`,
+    smilScalePulse(0.92, 1.18, "3.4s"),
+    smilOpacityPulse(0.35, 0.72, "3.4s"),
+    `    <circle cx="0" cy="0" r="10.5" fill="url(#${gid})"/>`,
+    `  </g>`,
+    `</g>`,
+  ].join("\n");
+}
+
+/**
+ * Halo with SMIL breathe for idle <img> channel. Reuses haloMarkup geometry but
+ * wraps the core in SMIL (CSS halo-breathe only runs on object channel).
+ */
+function idleHaloMarkup(viewBox, stageId) {
+  // Idle halo is gated by IDLE_AURA_TIER (not KNOCK_FX_TIER) so high realms can
+  // drop soft halo when another behind motif owns the silhouette.
+  if (!idleAuraTier(stageId).halo) return "";
+  const tier = knockFxTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.42;
+  const gid = `idle-buddhalight-${stageId}`;
+  const rest = Math.min(0.58, 0.34 + tier.peak * 0.5);
+  const bright = Math.min(0.95, 0.6 + tier.peak * 0.55);
+  const parts = [
+    `<g id="cult-halo" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`,
+    `  <defs><radialGradient id="${gid}" cx="50%" cy="50%" r="50%">`,
+    `    <stop offset="0%" stop-color="${tier.palette[2]}" stop-opacity="1"/>`,
+    `    <stop offset="38%" stop-color="${tier.palette[2]}" stop-opacity="0.72"/>`,
+    `    <stop offset="66%" stop-color="${tier.palette[0]}" stop-opacity="0.32"/>`,
+    `    <stop offset="100%" stop-color="${tier.palette[0]}" stop-opacity="0"/>`,
+    `  </radialGradient></defs>`,
+    `  <g class="halo-core">`,
+    smilScalePulse(0.97, 1.05, "3.6s"),
+    smilOpacityPulse(rest.toFixed(2), bright.toFixed(2), "3.6s"),
+    `    <circle cx="0" cy="0" r="9.8" fill="url(#${gid})"/>`,
+  ];
+  if (tier.haloRim) {
+    const rim = tier.scrolls;
+    for (let i = 0; i < rim; i += 1) {
+      const a = -Math.PI / 2 + (i / rim) * Math.PI * 2;
+      const rx = Math.cos(a) * 7.2;
+      const ry = Math.sin(a) * 7.2 * 0.7;
+      const rot = (a * 180) / Math.PI + 90;
+      parts.push(
+        `    <g transform="translate(${rx.toFixed(2)} ${ry.toFixed(2)}) rotate(${rot.toFixed(1)})">` +
+          `<path d="${SCROLL_CURL_PATH}" fill="none" stroke="${tier.palette[0]}" ` +
+          `stroke-width="0.9" stroke-linecap="round" transform="scale(0.42)" opacity="0.8"/></g>`
+      );
+    }
+  }
+  parts.push(`  </g>`, `</g>`);
+  return parts.join("\n");
+}
+
+/** Persistent 祥云 ring with SMIL orbit for idle (arhat+). */
+function idleCloudMarkup(viewBox, stageId) {
+  if (!stageIdleClouds(stageId)) return "";
+  const tier = knockFxTier(stageId);
+  const aura = idleAuraTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.42;
+  const size = viewBox.width * (tier.cloudScale / 2.4) * 0.92;
+  const half = size / 2;
+  const b64 = cloudFxBase64();
+  const peak = Math.min(0.85, (tier.cloudPeak || 0.8) * 0.72);
+  const rest = peak * 0.55;
+  // Buddha gets a fuller, slower orbit; mid realms a gentler pulse-orbit.
+  const dur = aura.bloom ? "8s" : "10s";
+  return [
+    `<g id="cloud-fx-pos" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`,
+    `  <g id="cloud-fx">`,
+    smilRotate(dur),
+    smilScalePulse(0.95, 1.06, dur),
+    smilOpacityPulse(rest.toFixed(2), peak.toFixed(2), dur),
+    `    <image href="data:image/png;base64,${b64}" x="${(-half).toFixed(2)}" y="${(-half).toFixed(2)}" ` +
+      `width="${size.toFixed(2)}" height="${size.toFixed(2)}" preserveAspectRatio="xMidYMid meet"/>`,
+    `  </g>`,
+    `</g>`,
+  ].join("\n");
+}
+
+/** Floating 凡尘 motes — warm temple dust. `scale` enlarges for mortal. */
+function idleMotesMarkup(viewBox, count, scale = 1) {
+  if (count <= 0) return "";
+  const sc = Math.max(0.8, Number(scale) || 1);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.58;
+  const parts = [`<g id="idle-motes" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`];
+  for (let i = 0; i < count; i += 1) {
+    const ox = -4.2 + i * (8.4 / Math.max(1, count - 1));
+    const delay = (i * 0.45).toFixed(2);
+    const dur = (2.8 + (i % 3) * 0.4).toFixed(1);
+    const r = (0.38 * sc + (i % 2) * 0.12 * sc).toFixed(2);
+    const fill = i % 2 === 0 ? "#D4B878" : "#E8C98A";
+    parts.push(
+      `  <g transform="translate(${ox.toFixed(2)} 0)">`,
+      `    <circle cx="0" cy="0" r="${r}" fill="${fill}">`,
+      `      <animate attributeName="opacity" dur="${dur}s" begin="${delay}s" repeatCount="indefinite" ` +
+        `keyTimes="0;0.15;0.7;1" values="0;0.95;0.55;0"/>`,
+      `      <animateTransform attributeName="transform" type="translate" dur="${dur}s" begin="${delay}s" ` +
+        `repeatCount="indefinite" values="0 1.2;${(0.5 - (i % 3) * 0.3).toFixed(1)} -2.8;${(-0.4 + (i % 2) * 0.4).toFixed(1)} -5.5;0.2 -7.5" additive="sum"/>`,
+      `    </circle>`,
+      `  </g>`
+    );
+  }
+  parts.push(`</g>`);
+  return parts.join("\n");
+}
+
+/** Incense stick + rising smoke curl (adept). */
+function idleIncenseMarkup(viewBox) {
+  const cx = viewBox.x + viewBox.width / 2 - 5.2;
+  const by = viewBox.y + viewBox.height - 3.2;
+  return [
+    `<g id="idle-incense" pointer-events="none" transform="translate(${cx.toFixed(2)} ${by.toFixed(2)})">`,
+    `  <rect x="-0.18" y="-3.2" width="0.36" height="3.2" rx="0.12" fill="#8B5E3C"/>`,
+    `  <circle cx="0" cy="-3.35" r="0.28" fill="#E07040">`,
+    smilOpacityPulse(0.55, 1, "1.1s"),
+    `  </circle>`,
+    `  <g transform="translate(0 -3.6)">`,
+    `    <path d="M 0 0 Q 0.6 -1.4 0.15 -2.8 Q -0.5 -4.2 0.3 -5.6" fill="none" stroke="#C8C0B0" ` +
+      `stroke-width="0.35" stroke-linecap="round" opacity="0.55">`,
+    `      <animate attributeName="opacity" dur="2.8s" repeatCount="indefinite" values="0.2;0.65;0.25"/>`,
+    `      <animateTransform attributeName="transform" type="translate" dur="2.8s" repeatCount="indefinite" ` +
+      `values="0 0;0.3 -0.6;-0.2 -1.4" additive="sum"/>`,
+    `    </path>`,
+    `  </g>`,
+    `</g>`,
+  ].join("\n");
+}
+
+/** Soft candle flame flicker (novice) — left of character. */
+function idleCandleMarkup(viewBox, stageId) {
+  const tier = knockFxTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2 - 5.4;
+  const by = viewBox.y + viewBox.height - 3.0;
+  return [
+    `<g id="idle-candle" pointer-events="none" transform="translate(${cx.toFixed(2)} ${by.toFixed(2)})">`,
+    `  <rect x="-0.45" y="-2.4" width="0.9" height="2.4" rx="0.15" fill="#F5E6C8"/>`,
+    `  <rect x="-0.7" y="0" width="1.4" height="0.45" rx="0.1" fill="#C9A227"/>`,
+    `  <g transform="translate(0 -2.7)">`,
+    `    <ellipse cx="0" cy="-0.7" rx="0.55" ry="0.95" fill="${tier.palette[2]}">`,
+    `      <animate attributeName="opacity" dur="0.85s" repeatCount="indefinite" values="0.75;1;0.7"/>`,
+    `      <animateTransform attributeName="transform" type="scale" dur="0.85s" repeatCount="indefinite" ` +
+      `values="1 1;1.08 1.15;0.95 0.9;1 1" additive="sum"/>`,
+    `    </ellipse>`,
+    `    <ellipse cx="0" cy="-0.35" rx="0.22" ry="0.4" fill="#FFF6D0" opacity="0.9">`,
+    `      <animate attributeName="opacity" dur="0.6s" begin="0.1s" repeatCount="indefinite" values="0.6;1;0.55"/>`,
+    `    </ellipse>`,
+    `  </g>`,
+    `</g>`,
+  ].join("\n");
+}
+
+/** Drifting sutra glyphs (arhat) — small golden characters. */
+function idleGlyphsMarkup(viewBox, count, stageId) {
+  if (count <= 0) return "";
+  const tier = knockFxTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.38;
+  // Compact glyph-like marks (abstract, not real scripture) — reads as "经文" at pet size.
+  const glyphs = ["※", "✦", "◇", "○"];
+  const parts = [`<g id="idle-glyphs" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`];
+  for (let i = 0; i < count; i += 1) {
+    const a = (i / count) * Math.PI * 2 - Math.PI / 2;
+    const ox = Math.cos(a) * 5.2;
+    const oy = Math.sin(a) * 3.4;
+    const delay = (i * 0.55).toFixed(2);
+    const ch = glyphs[i % glyphs.length];
+    parts.push(
+      `  <text x="${ox.toFixed(2)}" y="${oy.toFixed(2)}" font-size="1.6" fill="${tier.palette[0]}" ` +
+        `text-anchor="middle" opacity="0" font-family="serif">`,
+      `    ${ch}`,
+      `    <animate attributeName="opacity" dur="4s" begin="${delay}s" repeatCount="indefinite" ` +
+        `keyTimes="0;0.15;0.7;1" values="0;0.75;0.4;0"/>`,
+      `    <animateTransform attributeName="transform" type="translate" dur="4s" begin="${delay}s" ` +
+        `repeatCount="indefinite" values="0 0;0.2 -1.2;-0.15 -2.8;0.1 -4" additive="sum"/>`,
+      `  </text>`
+    );
+  }
+  parts.push(`</g>`);
+  return parts.join("\n");
+}
+
+/**
+ * Lotus petals — two exclusive modes so 菩萨 / 佛祖 don't read the same:
+ *   orbit  (bodhisattva) — ring slowly rotates around the sit
+ *   drift  (buddha)      — petals float upward / outward (天降)
+ */
+function idlePetalsMarkup(viewBox, stageId) {
+  const aura = idleAuraTier(stageId);
+  const n = aura.petals || 0;
+  if (n <= 0) return "";
+  const tier = knockFxTier(stageId);
+  const cx = viewBox.x + viewBox.width / 2;
+  const cy = viewBox.y + viewBox.height * 0.42;
+  const mode = aura.petalMode === "orbit" ? "orbit" : "drift";
+  const parts = [
+    `<g id="idle-petals" pointer-events="none" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)})">`,
+  ];
+
+  if (mode === "orbit") {
+    parts.push(`  <g>`);
+    parts.push(smilRotate("12s"));
+    for (let p = 0; p < n; p += 1) {
+      const a = (p / n) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * 5.4;
+      const py = Math.sin(a) * 3.6;
+      const rot = (a * 180) / Math.PI + 90;
+      parts.push(
+        `    <g transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${rot.toFixed(1)})">`,
+        `      <ellipse cx="0" cy="0" rx="0.85" ry="1.9" fill="${tier.palette[p % tier.palette.length]}" opacity="0.72">`,
+        smilOpacityPulse(0.45, 0.85, "3.2s", `${(p * 0.25).toFixed(2)}s`),
+        `      </ellipse>`,
+        `    </g>`
+      );
+    }
+    parts.push(`  </g>`);
+  } else {
+    for (let p = 0; p < n; p += 1) {
+      const a = (p / n) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * (1.6 + (p % 3) * 0.7);
+      const py = Math.sin(a) * (1.1 + (p % 2) * 0.4) + 1.2;
+      const rot = (a * 180) / Math.PI + 40;
+      const delay = (p * 0.4).toFixed(2);
+      const dur = "4.8s";
+      parts.push(
+        `  <g transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${rot.toFixed(1)})">`,
+        `    <ellipse cx="0" cy="0" rx="0.9" ry="2.0" fill="${tier.palette[p % tier.palette.length]}" opacity="0">`,
+        `      <animate attributeName="opacity" dur="${dur}" begin="${delay}s" repeatCount="indefinite" ` +
+          `keyTimes="0;0.12;0.65;1" values="0;0.9;0.4;0"/>`,
+        `      <animateTransform attributeName="transform" type="translate" dur="${dur}" begin="${delay}s" ` +
+          `repeatCount="indefinite" values="0 0;${(0.4 - (p % 3) * 0.3).toFixed(1)} -2.4;${(-0.3 + (p % 2) * 0.5).toFixed(1)} -5.2;0.2 -7.8" additive="sum"/>`,
+        `      <animateTransform attributeName="transform" type="rotate" dur="${dur}" begin="${delay}s" ` +
+          `repeatCount="indefinite" values="0;12;28;40" additive="sum"/>`,
+        `    </ellipse>`,
+        `  </g>`
+      );
+    }
+  }
+
+  parts.push(`</g>`);
+  return parts.join("\n");
+}
+
+/**
+ * Idle「功德结界」layers. Split into behind (under sprite) and front (over sprite)
+ * so grass/incense/candle sit in the scene while motes/glyphs/petals can float over.
+ * All motion is SMIL — idle uses the <img> channel where CSS animations do not run.
+ */
+function idleAuraMarkup(viewBox, stageId) {
+  const aura = idleAuraTier(stageId);
+  const behind = [
+    idleBloomMarkup(viewBox, stageId),
+    idleHaloMarkup(viewBox, stageId),
+    idleCloudMarkup(viewBox, stageId),
+    aura.incense ? idleIncenseMarkup(viewBox) : "",
+    aura.candle ? idleCandleMarkup(viewBox, stageId) : "",
+  ].filter(Boolean).join("\n");
+
+  const front = [
+    idleMotesMarkup(viewBox, aura.motes || 0, aura.moteScale || 1),
+    idleGlyphsMarkup(viewBox, aura.glyphs || 0, stageId),
+    idlePetalsMarkup(viewBox, stageId),
+  ].filter(Boolean).join("\n");
+
+  return { behind, front };
+}
+
+/**
+ * Idle SVG: AI raster + per-stage 功德结界 (SMIL). Character stays put; the aura
+ * is the stage-differentiating story (凡尘 → 线香 → 烛光 → 佛光经文 → 祥云莲瓣 → 极乐).
+ */
+function wrapIdleSvg(stageId, pngBuffer, viewBox) {
+  const vb = `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
+  const cx = viewBox.x + viewBox.width / 2;
+  const by = viewBox.y + viewBox.height - 1.2;
+  const tier = knockFxTier(stageId);
+  const aura = idleAuraMarkup(viewBox, stageId);
+
+  // CSS breathe kept for object-channel preview/petdex. Halo CSS intentionally
+  // off here — idleHaloMarkup already drives halo via SMIL; stacking both on
+  // object channel fights (transform/opacity double-apply).
+  const style = animationStyle("idle", { tier, hasHalo: false });
+
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="256" height="256">`,
+    `<!-- cultivator:${stageId}:idle AI sprite + 功德结界 SMIL (scripts/embed-cultivator-ai-svgs.js) -->`,
+    style,
+    `<ellipse id="shadow-js" cx="${cx}" cy="${by}" rx="5.4" ry="1.15" fill="#000" opacity="0.22"/>`,
+    aura.behind,
+    `<g id="sprite-js">`,
+    // Subtle SMIL bob so idle reads as alive on the <img> channel.
+    smilTranslateY(0.3, "3.2s"),
+    rasterImageTag(pngBuffer, viewBox),
+    `</g>`,
+    aura.front,
+    `<g id="eyes-js" opacity="0"><circle cx="8" cy="6.25" r="0.01"/></g>`,
+    `<g id="body-js" opacity="0"><circle cx="8" cy="12" r="0.01"/></g>`,
+    "</svg>",
+    "",
+  ].join("\n");
+}
+
 function wrapRasterInSvg(stageId, action, pngBuffer, viewBox) {
+  if (action === "idle") {
+    return wrapIdleSvg(stageId, pngBuffer, viewBox);
+  }
   const vb = `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
   const cx = viewBox.x + viewBox.width / 2;
   const by = viewBox.y + viewBox.height - 1.2;
@@ -761,12 +1158,17 @@ if (require.main === module) main();
 module.exports = {
   embedAll,
   wrapRasterInSvg,
+  wrapIdleSvg,
   wrapWorkingFramesInSvg,
   wrapKnockLayeredSvg,
   animationStyle,
+  idleAuraMarkup,
+  idleAuraTier,
   readWorkingFrameBuffers,
   readLayeredKnockAssets,
   KNOCK_LAYOUT,
+  KNOCK_FX_TIER,
+  IDLE_AURA_TIER,
   WORKING_FRAME_COUNT,
   GENERATED_DIR,
   OUT_DIR,

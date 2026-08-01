@@ -166,6 +166,11 @@ const {
 } = require("./telegram-approval-settings");
 const { validateDiscordPresence } = require("./discord-presence-settings");
 const {
+  validateGames,
+  normalizeGames,
+  setGameEnabled,
+} = require("./games-settings");
+const {
   validateFeishuApproval,
 } = require("./feishu-approval-settings");
 const { EVENTS: TELEGRAM_MIGRATION_EVENTS } = require("./telegram-migration-state");
@@ -642,6 +647,9 @@ const updateRegistry = {
   },
   discordPresence(value) {
     return validateDiscordPresence(value);
+  },
+  games(value) {
+    return validateGames(value);
   },
   feishuApproval(value) {
     return validateFeishuApproval(value);
@@ -2052,6 +2060,19 @@ function setTextScaleForDisplay(payload, deps) {
   return { status: "ok", commit: { textScaleByDisplay: next } };
 }
 
+function gamesSetEnabled(payload, deps) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "games.setEnabled requires { gameId, enabled }" };
+  }
+  const gameId = typeof payload.gameId === "string" ? payload.gameId.trim() : "";
+  if (!gameId || gameId.length > 64) {
+    return { status: "error", message: "invalid gameId" };
+  }
+  const snapshot = (deps && deps.snapshot) || {};
+  const next = setGameEnabled(normalizeGames(snapshot.games), gameId, payload.enabled === true);
+  return { status: "ok", commit: { games: next } };
+}
+
 const commandRegistry = {
   addCustomApplication,
   removeTheme,
@@ -2117,6 +2138,7 @@ const commandRegistry = {
   "feishuApproval.test": feishuApprovalSendTest,
   "telegramMigration.snapshot": telegramMigrationSnapshot,
   "telegramMigration.dispatch": telegramMigrationDispatch,
+  "games.setEnabled": gamesSetEnabled,
 };
 
 module.exports = {

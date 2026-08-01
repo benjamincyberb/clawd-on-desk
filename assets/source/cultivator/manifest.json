@@ -6,7 +6,7 @@
     "centerX": 8,
     "baselineY": 20,
     "visibleHeightRatio": 0.62,
-    "baselineBottomRatio": 0.06
+    "baselineBottomRatio": 0.18
   },
   "hitBoxes": {
     "default": { "x": 0, "y": 2, "w": 16, "h": 16 },

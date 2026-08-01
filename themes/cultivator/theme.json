@@ -21,7 +21,7 @@
     "centerX": 8,
     "baselineY": 20,
     "visibleHeightRatio": 0.62,
-    "baselineBottomRatio": 0.06
+    "baselineBottomRatio": 0.18
   },
   "eyeTracking": {
     "enabled": false,

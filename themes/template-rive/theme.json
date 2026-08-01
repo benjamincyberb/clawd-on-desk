@@ -10,19 +10,15 @@
 
   "renderBackend": "rive",
   "rive": {
-    "_comment": "Teddy sample uses Login Machine + numLook / isHandsUp / isChecking / trigSuccess|trigFail. Skills-style files can use Level / Hovering / bump instead.",
+    "_comment": "Bindings map Clawd's runtime signals (agent state / hover / pointer / click) onto THIS .riv's exact input names. The renderer is theme-agnostic — it just applies these. Sources: hover, stateIn, pointerX/pointerY, state (number map), constant, and on:{enterStates,click} for triggers. Set rive.fx=true for the optional glow/particle overlay.",
     "file": "pet.riv",
     "stateMachine": "Login Machine",
-    "inputs": {
-      "level": "numLook",
-      "hover": "isHandsUp",
-      "bump": "trigSuccess"
-    },
-    "stateLevels": {
-      "idle": 0,
-      "thinking": 1,
-      "working": 2,
-      "juggling": 2
+    "bindings": {
+      "numLook": { "from": "pointerX", "range": [0, 100], "default": 50 },
+      "isHandsUp": { "from": "hover" },
+      "isChecking": { "from": "stateIn", "states": ["thinking", "notification"] },
+      "trigSuccess": { "on": { "enterStates": ["attention", "notification"], "click": true } },
+      "trigFail": { "on": { "enterStates": ["error"] } }
     }
   },
 

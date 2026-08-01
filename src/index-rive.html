@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <!-- Rive canvas-single needs wasm-unsafe-eval for WASM instantiation (WASM is inlined in vendor/rive.js). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'self' file:; img-src 'self' file: data:; media-src 'self' file:; connect-src 'self' file: data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'self' file:; img-src 'self' file: data: blob:; media-src 'self' file: blob:; connect-src 'self' file: data: blob:">
   <title>Clawd (Rive)</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; outline: none; -webkit-user-select: none; user-select: none; }
@@ -33,6 +33,7 @@
   </div>
   <pre id="rive-error"></pre>
   <script src="vendor/rive.js"></script>
+  <script src="rive-bindings.js"></script>
   <script src="rive-renderer.js"></script>
   <script src="size-edit-overlay.js"></script>
 </body>

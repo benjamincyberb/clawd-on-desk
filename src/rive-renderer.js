@@ -58,10 +58,6 @@ let timeMs = 0;
 let burstUntil = 0;
 let bootGeneration = 0;
 let loadedAssetUrl = null;
-// "teddy" = classic login bear (numLook / hands / success|fail).
-// "skills" = Level / Hovering. "generic" = best-effort triggers.
-let inputProfile = "generic";
-
 function showError(message) {
   if (!errorEl) return;
   errorEl.style.display = "block";
@@ -112,13 +108,78 @@ function getRiveConfig() {
   for (const name of DEFAULT_STATE_MACHINES) {
     if (!stateMachines.includes(name)) stateMachines.push(name);
   }
+  const bindings = rive && (Array.isArray(rive.bindings)
+    || (rive.bindings && typeof rive.bindings === "object"))
+    ? rive.bindings
+    : null;
   return {
     file: rive && typeof rive.file === "string" ? rive.file : null,
     assetUrl: rive && typeof rive.assetUrl === "string" && rive.assetUrl ? rive.assetUrl : null,
     stateMachines,
     inputs,
     stateLevels,
+    bindings,
+    fx: !!(rive && rive.fx === true),
   };
+}
+
+// Canonical, theme-authored input bindings for the active config. The renderer
+// has zero knowledge of any specific .riv, input name, or character — it only
+// applies these ops by exact input name. rive-bindings.js owns the shape and
+// the legacy (inputs/stateLevels) adapter.
+function resolveActiveBindings() {
+  const RB = window.RiveBindings;
+  if (!RB || typeof RB.normalizeRiveBindings !== "function") return [];
+  try {
+    return RB.normalizeRiveBindings(getRiveConfig());
+  } catch {
+    return [];
+  }
+}
+
+let activeBindings = [];
+
+// Apply a flat op list (from RiveBindings.computeInputOps) to the live state
+// machine. Each op targets an input by exact name; type is checked against the
+// real input so a mismatched declaration is skipped instead of throwing.
+function applyOps(ops) {
+  if (!Array.isArray(ops)) return;
+  for (const op of ops) {
+    if (!op || typeof op.input !== "string") continue;
+    const input = findInput(op.input);
+    if (!input) continue;
+    if (op.kind === "trigger") {
+      if (typeof input.fire === "function") { try { input.fire(); } catch {} }
+    } else if (op.kind === "bool") {
+      if (typeof input.value === "boolean") { try { input.value = !!op.set; } catch {} }
+    } else if (op.kind === "number") {
+      if (typeof input.value === "number" && Number.isFinite(op.set)) {
+        try { input.value = op.set; } catch {}
+      }
+    }
+  }
+}
+
+function computeOps(cause) {
+  const RB = window.RiveBindings;
+  if (!RB || typeof RB.computeInputOps !== "function") return [];
+  const w = Math.max(1, (canvasEl && canvasEl.clientWidth) || 1);
+  const h = Math.max(1, (canvasEl && canvasEl.clientHeight) || 1);
+  return RB.computeInputOps(activeBindings, {
+    cause,
+    state: pendingState,
+    hover,
+    pointerX01: hasPointer ? pointerX / w : null,
+    pointerY01: hasPointer ? pointerY / h : null,
+  });
+}
+
+// Overlay FX (radial glow + rising particles + cursor trail) is opt-in.
+// Real themes render their .riv untouched unless they set rive.fx: true.
+// The dev spike demo keeps FX so its showcase behaviour is unchanged.
+function fxEnabled() {
+  if (isSpikeMode()) return true;
+  return getRiveConfig().fx === true;
 }
 
 function resolveRivUrl() {
@@ -155,7 +216,19 @@ function notifyPetVisualReadyOnce() {
   logInfo("pet-visual-ready sent");
 }
 
+function removeFxCanvas() {
+  if (fxRaf) { cancelAnimationFrame(fxRaf); fxRaf = 0; }
+  fxParticles = [];
+  fxTrail = [];
+  if (fxCanvas && fxCanvas.parentNode) {
+    try { fxCanvas.parentNode.removeChild(fxCanvas); } catch {}
+  }
+  fxCanvas = null;
+  fxCtx = null;
+}
+
 function ensureFxCanvas() {
+  if (!fxEnabled()) { removeFxCanvas(); return; }
   if (fxCanvas || !stageEl) return;
   fxCanvas = document.createElement("canvas");
   fxCanvas.id = "rive-fx";
@@ -189,12 +262,6 @@ function resizeCanvases() {
   }
 }
 
-function detectInputProfile() {
-  if (findInput("numLook", "numlook")) return "teddy";
-  if (findInput("Level", "level")) return "skills";
-  return "generic";
-}
-
 function indexInputs() {
   inputsByName = Object.create(null);
   if (!riveInstance || !smName) return;
@@ -209,44 +276,19 @@ function indexInputs() {
     inputsByName[String(input.name)] = input;
     inputsByName[String(input.name).toLowerCase()] = input;
   }
-  inputProfile = detectInputProfile();
-  logInfo(
-    "inputs:",
-    Object.keys(inputsByName).filter((k) => k === k.toLowerCase()),
-    "profile=",
-    inputProfile,
-  );
+  logInfo("inputs:", Object.keys(inputsByName).filter((k) => k === k.toLowerCase()));
 }
 
-function findInput(...names) {
-  for (const name of names) {
-    if (!name) continue;
-    const hit = inputsByName[name] || inputsByName[String(name).toLowerCase()];
-    if (hit) return hit;
-  }
-  return null;
-}
-
-function fireTrigger(...names) {
-  const input = findInput(...names);
-  if (!input || typeof input.fire !== "function") return false;
-  try { input.fire(); return true; } catch { return false; }
-}
-
-function setBool(value, ...names) {
-  const input = findInput(...names);
-  if (!input || typeof input.value !== "boolean") return false;
-  try { input.value = !!value; return true; } catch { return false; }
-}
-
-function setNumber(value, ...names) {
-  const input = findInput(...names);
-  if (!input || typeof input.value !== "number") return false;
-  if (!Number.isFinite(value)) return false;
-  try { input.value = value; return true; } catch { return false; }
+// Resolve a live state-machine input by exact name (case-insensitive as a
+// convenience for author typos). No fuzzy alias lists — bindings name the
+// input explicitly.
+function findInput(name) {
+  if (!name) return null;
+  return inputsByName[name] || inputsByName[String(name).toLowerCase()] || null;
 }
 
 function spawnBurst(x, y, count, hue) {
+  if (!fxEnabled()) return;
   const n = Math.max(8, Math.min(40, count || 18));
   for (let i = 0; i < n; i++) {
     const ang = Math.random() * Math.PI * 2;
@@ -266,41 +308,25 @@ function spawnBurst(x, y, count, hue) {
 
 function applyPointerToInputs() {
   if (!ready || !canvasEl) return;
-  const cfg = getRiveConfig();
   const w = Math.max(1, canvasEl.clientWidth || 1);
   const h = Math.max(1, canvasEl.clientHeight || 1);
   const cx = w * 0.5;
   const cy = h * 0.55;
-  const dx = pointerX - cx;
-  const dy = pointerY - cy;
-  const dist = Math.hypot(dx, dy);
+  const dist = Math.hypot(pointerX - cx, pointerY - cy);
   const over = hasPointer && pointerX >= 0 && pointerY >= 0 && pointerX <= w && pointerY <= h;
   const near = hasPointer && dist < Math.min(w, h) * 0.42;
-
   hover = over || near;
 
-  if (inputProfile === "teddy") {
-    // Classic teddy: numLook ~0 (left) … 100 (right). Cover eyes when pointer is near.
-    const look = hasPointer ? Math.max(0, Math.min(100, (pointerX / w) * 100)) : 50;
-    setNumber(look, "numLook", "numlook", "look");
-    // Don't fight agent-state hands/check while busy — only idle hover covers eyes.
-    if (pendingState === "idle" || pendingState === "sleeping" || pendingState === "waking") {
-      setBool(hover, "isHandsUp", "ishandsup", "Hands_up");
-    }
-  } else {
-    setBool(hover, cfg.inputs.hover, "Hovering", "hover", "isHovered", "Hover", "pressed");
-    const nx = hasPointer ? (pointerX / w) * 100 : 50;
-    const ny = hasPointer ? (pointerY / h) * 100 : 50;
-    setNumber(nx, "Axis_X", "axis_x", "x", "lookX", "LookX", "numLook");
-    setNumber(ny, "Axis_Y", "axis_y", "y", "lookY", "LookY");
-  }
+  applyOps(computeOps("pointer"));
 
-  if (hasPointer && inputProfile !== "teddy") {
+  if (fxEnabled() && hasPointer) {
     fxTrail.push({ x: pointerX, y: pointerY, age: 0, life: 0.35 });
     if (fxTrail.length > 28) fxTrail.shift();
   }
 }
 
+// Coarse 0..2 level derived from stateLevels — used ONLY for opt-in FX
+// hue/intensity, never to drive the .riv (that is binding-only).
 function levelForState(state) {
   const cfg = getRiveConfig();
   const s = String(state || "idle");
@@ -313,57 +339,19 @@ function levelForState(state) {
   return 0;
 }
 
-function applyTeddyState(s) {
-  // Map Clawd agent moods onto the classic login-bear machine.
-  const checking = s === "thinking" || s === "notification";
-  const handsUp = s === "working" || s === "juggling" || s === "sleeping";
-  setBool(checking, "isChecking", "ischecking", "isFocus", "isfocus");
-  setBool(handsUp, "isHandsUp", "ishandsup", "isPrivateField", "isprivatefield");
-  if (s === "attention" || s === "happy") {
-    fireTrigger("trigSuccess", "successTrigger", "success", "Success");
-  } else if (s === "error") {
-    fireTrigger("trigFail", "failTrigger", "fail", "Fail");
-  } else if (s === "working" || s === "juggling") {
-    // Soft "busy" pulse without permanent fail/success.
-    fireTrigger("trigSuccess", "successTrigger");
-  }
-  level = handsUp ? 2 : checking ? 1 : 0;
-}
-
 function applyAgentState(state) {
   pendingState = state || "idle";
   if (!ready) return;
-  const cfg = getRiveConfig();
   const s = String(pendingState);
 
-  if (inputProfile === "teddy") {
-    applyTeddyState(s);
-  } else {
-    level = levelForState(s);
-    let levelSet = setNumber(level, cfg.inputs.level, "Level", "level", "skill", "Skill");
-    if (!levelSet) {
-      if (level >= 2) levelSet = fireTrigger("Expert", "expert") || setBool(true, "Expert");
-      else if (level === 1) {
-        levelSet = fireTrigger("Intermediate ", "Intermediate", "intermediate")
-          || setBool(true, "Intermediate ", "Intermediate");
-      }
-    }
-    if (!levelSet && level > 0) {
-      fireTrigger(cfg.inputs.bump, "bump", "Bump", "pressed", "Press", "tap", "click", "Trigger 1");
-    }
-  }
+  applyOps(computeOps("state"));
 
+  level = levelForState(s);
   const w = canvasEl ? canvasEl.clientWidth : 128;
   const h = canvasEl ? canvasEl.clientHeight : 128;
   const hue = level === 2 ? 15 : level === 1 ? 200 : 140;
-  // Teddy already has rich character motion — keep FX light.
-  if (inputProfile !== "teddy") {
-    spawnBurst(w * 0.5, h * 0.55, 12 + level * 8, hue);
-  } else if (s === "attention" || s === "error" || s === "working") {
-    spawnBurst(w * 0.5, h * 0.45, 10, hue);
-  }
-  const profileTag = inputProfile === "teddy" ? "teddy" : inputProfile === "skills" ? "skills" : "rive";
-  setBadge(`Rive · ${profileTag} · ${s}${hover ? " · hover" : ""}`);
+  spawnBurst(w * 0.5, h * 0.55, 12 + level * 8, hue);
+  setBadge(`Rive · ${displayName()} · ${s}${hover ? " · hover" : ""}`);
 }
 
 function tickFx(now) {
@@ -377,8 +365,7 @@ function tickFx(now) {
   fxCtx.clearRect(0, 0, w, h);
 
   const hue = level === 2 ? 18 : level === 1 ? 205 : 155;
-  // Teddy is the visual hero — keep underglow soft so the character stays readable.
-  const pulseBase = inputProfile === "teddy" ? 0.08 : 0.18;
+  const pulseBase = 0.18;
   const g = fxCtx.createRadialGradient(w * 0.5, h * 0.58, 8, w * 0.5, h * 0.58, Math.min(w, h) * 0.55);
   const pulse = pulseBase + Math.sin(timeMs * 0.004) * 0.03 + (burstUntil > timeMs ? 0.08 : 0);
   g.addColorStop(0, `hsla(${hue}, 90%, 60%, ${pulse})`);
@@ -386,7 +373,7 @@ function tickFx(now) {
   fxCtx.fillStyle = g;
   fxCtx.fillRect(0, 0, w, h);
 
-  if (inputProfile !== "teddy" && Math.random() < 0.25 + level * 0.1) {
+  if (Math.random() < 0.25 + level * 0.1) {
     fxParticles.push({
       x: Math.random() * w,
       y: h + 4,
@@ -441,8 +428,7 @@ function tickFx(now) {
 
   if (badgeEl && ready) {
     const hoverTag = hover ? " · hover" : "";
-    const tag = inputProfile === "teddy" ? "teddy" : displayName();
-    badgeEl.textContent = `Rive · ${tag}${hoverTag} · ${pendingState}`;
+    badgeEl.textContent = `Rive · ${displayName()}${hoverTag} · ${pendingState}`;
   }
 
   fxRaf = requestAnimationFrame(tickFx);
@@ -567,6 +553,7 @@ async function boot(reason) {
   loadedAssetUrl = rivUrl;
   resizeCanvases();
   indexInputs();
+  activeBindings = resolveActiveBindings();
   ready = true;
   applyAgentState(pendingState);
   applyPointerToInputs();
@@ -574,7 +561,9 @@ async function boot(reason) {
   setBadge(`Rive · ${displayName()} · ${smName} · L${level}`);
   logInfo("boot complete; sm=", smName, "inputs=", Object.keys(inputsByName).length);
 
-  fxRaf = requestAnimationFrame(tickFx);
+  if (fxEnabled()) {
+    fxRaf = requestAnimationFrame(tickFx);
+  }
 }
 
 function destroyApp() {
@@ -588,6 +577,7 @@ function applyThemeConfig(cfg) {
   activeThemeConfig = cfg || null;
   const nextUrl = resolveRivUrl();
   if (ready && loadedAssetUrl && nextUrl === loadedAssetUrl) {
+    activeBindings = resolveActiveBindings();
     applyAgentState(pendingState);
     applyPointerToInputs();
     return;
@@ -623,26 +613,12 @@ if (window.electronAPI && typeof window.electronAPI.onThemeConfig === "function"
 
 if (window.electronAPI && typeof window.electronAPI.onPlayClickReaction === "function") {
   window.electronAPI.onPlayClickReaction(() => {
-    const cfg = getRiveConfig();
     const w = canvasEl ? canvasEl.clientWidth : 128;
     const h = canvasEl ? canvasEl.clientHeight : 128;
-    if (inputProfile === "teddy") {
-      // Peek → success wave on click.
-      setBool(true, "isHandsUp", "ishandsup");
-      setTimeout(() => {
-        setBool(false, "isHandsUp", "ishandsup");
-        fireTrigger("trigSuccess", "successTrigger", "success");
-      }, 280);
-      spawnBurst(hasPointer ? pointerX : w * 0.5, hasPointer ? pointerY : h * 0.45, 14, 45);
-      setBadge("Rive · teddy · click");
-      return;
-    }
-    level = (level + 1) % 3;
-    setNumber(level, cfg.inputs.level, "Level", "level", "skill", "Skill");
-    fireTrigger(cfg.inputs.bump, "bump", "Bump", "pressed", "Press", "tap", "click", "Trigger 1");
-    setBool(true, cfg.inputs.hover, "Hovering", "hover", "pressed");
-    spawnBurst(hasPointer ? pointerX : w * 0.5, hasPointer ? pointerY : h * 0.55, 26, level === 2 ? 15 : 190);
-    setBadge(`Rive · ${displayName()} · L${level} · click`);
+    // Click reaction is theme-authored: fire whatever the theme bound to click.
+    applyOps(computeOps("click"));
+    spawnBurst(hasPointer ? pointerX : w * 0.5, hasPointer ? pointerY : h * 0.55, 20, level === 2 ? 15 : 190);
+    setBadge(`Rive · ${displayName()} · click`);
   });
 }
 

@@ -35,6 +35,10 @@ const {
   normalizeDiscordPresence,
 } = require("./discord-presence-settings");
 const {
+  cloneDefaultGames,
+  normalizeGames,
+} = require("./games-settings");
+const {
   cloneDefaultFeishuApproval,
   normalizeFeishuApproval,
 } = require("./feishu-approval-settings");
@@ -56,7 +60,7 @@ const {
   PET_ACCESSORY_IDS,
 } = require("./pet-customization-catalog");
 
-const CURRENT_VERSION = 12;
+const CURRENT_VERSION = 13;
 const DEFAULT_INTEGRATION_INSTALLED_IDS = Object.freeze(["claude-code", "codex"]);
 const DEFAULT_INTEGRATION_INSTALLED_SET = new Set(DEFAULT_INTEGRATION_INSTALLED_IDS);
 
@@ -402,6 +406,11 @@ const SCHEMA = {
     defaultFactory: () => cloneDefaultDiscordPresence(),
     normalize: normalizeDiscordPresence,
   },
+  games: {
+    type: "object",
+    defaultFactory: () => cloneDefaultGames(),
+    normalize: normalizeGames,
+  },
   feishuApproval: {
     type: "object",
     defaultFactory: () => cloneDefaultFeishuApproval(),
@@ -721,6 +730,11 @@ function migrate(raw) {
   if (out.version < 12) {
     if (!("showDock" in out)) out.showDock = true;
     out.version = 12;
+  }
+  // v12 -> v13: games prefs domain (enabledById map). Fresh defaults apply via
+  // validate(); migrate only bumps the version so older files stay readable.
+  if (out.version < 13) {
+    out.version = 13;
   }
   if ((typeof out.version === "number" ? out.version : 0) < CURRENT_VERSION) {
     out.version = CURRENT_VERSION;

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cultivator Idle Aura — img-channel QA</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1a1510; color: #f5e6c8; margin: 24px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    p { color: #c4b49a; font-size: 13px; margin: 0 0 20px; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; }
+    .card { background: #2a2218; border-radius: 12px; padding: 12px; text-align: center; width: 160px; }
+    .card h2 { font-size: 13px; margin: 0 0 8px; font-weight: 600; }
+    .card .motif { font-size: 11px; color: #a89878; margin: 0 0 8px; min-height: 2.4em; }
+    /* Checker + dark to catch false transparency AND near-black leftovers */
+    .stage {
+      width: 128px; height: 128px; margin: 0 auto;
+      background:
+        linear-gradient(45deg, #3a3020 25%, transparent 25%),
+        linear-gradient(-45deg, #3a3020 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #3a3020 75%),
+        linear-gradient(-45deg, transparent 75%, #3a3020 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-color: #1a1510;
+      border-radius: 8px;
+    }
+    .stage img { width: 128px; height: 128px; display: block; }
+    .tiny { width: 64px; height: 64px; margin: 8px auto 0; }
+    .tiny img { width: 64px; height: 64px; }
+    .note { margin-top: 24px; font-size: 12px; color: #8a7a60; max-width: 720px; }
+  </style>
+</head>
+<body>
+  <h1>Idle 功德结界 — &lt;img&gt; channel QA</h1>
+  <p>
+    Cultivator idle 在桌宠里走 img 通道；CSS @keyframes 不播放，只有 SMIL 会动。
+    下面全部用 &lt;img&gt; 加载 live SVG。在真实浏览器打开核：草/烟/烛/云/瓣是否在动、六境对比是否一眼可读。
+  </p>
+  <div class="row" id="cards"></div>
+  <p class="note">
+    Serve from repo root: <code>python3 -m http.server 8766</code><br/>
+    Open: <code>http://127.0.0.1:8766/assets/source/cultivator/idle-aura-img-qa.html</code>
+  </p>
+  <script>
+    const STAGES = [
+      { id: "mortal", name: "凡人", motif: "凡尘扬起" },
+      { id: "adept", name: "修行者", motif: "线香青烟 + 微尘" },
+      { id: "novice", name: "小和尚", motif: "佛光呼吸 + 烛火" },
+      { id: "arhat", name: "罗汉", motif: "佛光 + 经文（无祥云）" },
+      { id: "bodhisattva", name: "菩萨", motif: "祥云 + 旋绕莲瓣（无软佛光）" },
+      { id: "buddha", name: "佛祖", motif: "极乐 bloom + 天降莲瓣（无祥云）" },
+    ];
+    const t = Date.now();
+    const root = document.getElementById("cards");
+    for (const s of STAGES) {
+      const src = "../../../themes/cultivator/assets/" + s.id + "-idle.svg?_t=" + t;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML =
+        "<h2>" + s.name + " <code>" + s.id + "</code></h2>" +
+        "<div class=\"motif\">" + s.motif + "</div>" +
+        "<div class=\"stage\"><img src=\"" + src + "\" alt=\"" + s.id + " idle\"/></div>" +
+        "<div class=\"stage tiny\"><img src=\"" + src + "\" alt=\"" + s.id + " 64px\"/></div>";
+      root.appendChild(card);
+    }
+  </script>
+</body>
+</html>

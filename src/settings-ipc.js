@@ -412,6 +412,38 @@ function registerSettingsIpc(options = {}) {
     }
   });
 
+  handle("settings:list-games", () => {
+    try {
+      if (typeof options.listGames === "function") return options.listGames();
+      return [];
+    } catch (err) {
+      console.warn("Clawd: settings:list-games failed:", err && err.message);
+      return [];
+    }
+  });
+
+  handle("settings:launch-game", (_event, gameId) => {
+    try {
+      if (typeof options.launchGame !== "function") {
+        return { status: "error", message: "games runtime unavailable" };
+      }
+      return options.launchGame(String(gameId || ""));
+    } catch (err) {
+      return { status: "error", message: (err && err.message) || "launch failed" };
+    }
+  });
+
+  handle("settings:clear-game-saves", (_event, gameId) => {
+    try {
+      if (typeof options.clearGameSaves !== "function") {
+        return { status: "error", message: "games runtime unavailable" };
+      }
+      return options.clearGameSaves(String(gameId || ""));
+    } catch (err) {
+      return { status: "error", message: (err && err.message) || "clear failed" };
+    }
+  });
+
   handle("settings:get-merit-status", () => {
     try {
       if (typeof options.getMeritStatus === "function") {

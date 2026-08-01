@@ -1,5 +1,7 @@
 "use strict";
 
+const { normalizeRiveBindings } = require("./rive-bindings");
+
 // Defaults used when theme.json omits optional fields.
 
 const DEFAULT_SOUNDS = {
@@ -169,12 +171,20 @@ function normalizeRiveConfig(rawRive, rawTheme) {
   for (const name of DEFAULT_RIVE_STATE_MACHINES) {
     if (!stateMachines.includes(name)) stateMachines.push(name);
   }
+  // Declarative input bindings drive the generic renderer. Kept as a JSON-safe
+  // passthrough; rive-bindings.js is the single source of truth for shape and
+  // legacy (inputs/stateLevels) adaptation.
+  let bindings = null;
+  if (isPlainObject(src.bindings) || Array.isArray(src.bindings)) {
+    bindings = src.bindings;
+  }
   return {
     file: file || null,
     stateMachine: stateMachines[0] || DEFAULT_RIVE_STATE_MACHINES[0],
     stateMachines,
     inputs,
     stateLevels,
+    bindings,
     maxFileBytes: MAX_RIVE_FILE_BYTES,
   };
 }
@@ -232,6 +242,16 @@ function validateTheme(cfg) {
     const riveCfg = normalizeRiveConfig(cfg.rive, cfg);
     if (!riveCfg || !riveCfg.file || !riveCfg.file.toLowerCase().endsWith(".riv")) {
       errors.push('renderBackend "rive" requires rive.file or states.idle to reference a .riv asset');
+    }
+    if (isPlainObject(cfg.rive) && cfg.rive.bindings !== undefined) {
+      const raw = cfg.rive.bindings;
+      const isContainer = isPlainObject(raw) || Array.isArray(raw);
+      const count = Array.isArray(raw) ? raw.length : (isPlainObject(raw) ? Object.keys(raw).length : 0);
+      if (!isContainer) {
+        errors.push("rive.bindings must be an object keyed by input name or an array of entries");
+      } else if (count > 0 && normalizeRiveBindings({ bindings: raw }).length === 0) {
+        errors.push("rive.bindings has no usable entries (each needs a valid `from` or `on`)");
+      }
     }
     if (cfg.eyeTracking && cfg.eyeTracking.enabled) {
       errors.push('eyeTracking.enabled is not supported with renderBackend "rive"');

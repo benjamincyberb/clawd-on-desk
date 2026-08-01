@@ -145,6 +145,12 @@ const { WIN_TOPMOST_LEVEL } = createTopmostRuntime;
 const createThemeFadeSequencer = require("./theme-fade-sequencer");
 const createThemeRuntime = require("./theme-runtime");
 const { createMeritBridge } = require("./merit-bridge");
+const gameLoader = require("./game-loader");
+const gameStore = require("./game-store");
+const gameHost = require("./game-host");
+const { isGameEnabled } = require("./games-settings");
+// Custom clawd-game: scheme privileges must be registered before app ready.
+try { gameHost.registerSchemesBeforeReady(); } catch (_) { /* ignore */ }
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
@@ -662,6 +668,8 @@ function safeConsoleError(...args) {
 const themeLoader = require("./theme-loader");
 const createCodexPetMain = require("./codex-pet-main");
 themeLoader.init(__dirname, app.getPath("userData"));
+gameLoader.init(__dirname, app.getPath("userData"));
+gameStore.init(app.getPath("userData"));
 themeRuntime = createThemeRuntime({
   themeLoader,
   settingsController: _settingsController,

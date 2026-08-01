@@ -110,6 +110,12 @@ function createThemeContext(theme, options = {}) {
           stateMachines: [...(theme.rive.stateMachines || [])],
           inputs: { ...(theme.rive.inputs || {}) },
           stateLevels: { ...(theme.rive.stateLevels || {}) },
+          // Declarative input bindings (theme-authored). The renderer is
+          // theme-agnostic and drives inputs purely from these.
+          bindings: theme.rive.bindings || null,
+          // Opt-in overlay FX (glow + particles + cursor trail). Off by
+          // default so each .riv renders exactly its own artwork.
+          fx: theme.rive.fx === true,
           assetUrl: theme.rive.file && getRendererSourceAssetsPath()
             ? `${getRendererSourceAssetsPath().replace(/\/$/, "")}/${theme.rive.file}`
             : null,

@@ -114,9 +114,21 @@
   「境界越高越盛大」的单调性，不散落在各处。
 
 ### 3.5 常驻气场 vs 事件爆发要分清
-- **常驻**（佛光呼吸、祥云环转）在 idle+working 用**相同 CSS**，状态切换不闪跳。
+- **常驻**（佛光呼吸、祥云环转）在 idle+working 用**相同几何**，状态切换不闪跳。
 - **事件爆发**（敲中绽放、莲瓣飞散）只在 working。
 - 一旦把「常驻」做成「仅 working」，状态切换就会突兀跳变。
+- idle 另有「功德结界」质变 motif（草/香/烛/经文…）——这是**展示态故事**，不必镜像到 working；但结界层 MUST NOT 泄漏进 thinking/attention/error/sleeping。
+
+### 3.6 高阶 idle 坐底会贴画布底，布局裁切要留余量
+- 菩萨/佛祖 idle 带冠/莲台，内容几乎铺满 1024 画布（`bottomPad` 可低至 ~20–30px），映射到 viewBox 后坐底落到 y≈25。
+- 归一化布局的窗口裁切线 ≈ `viewBox底 - (|bottomRatio|/heightRatio)*viewBox高`；`baselineBottomRatio` 过小（曾为 0.06）时裁切线≈22，腿/莲台被切。
+- 现行 `baselineBottomRatio: 0.18` 把裁切线推到 ≈25.8。重生高阶 idle 仍应尽量留坐底透明 padding（标准 68–75% 身高），别依赖布局硬抬。
+
+### 3.7 idle 走 `<img>` 通道 → 动效必须 SMIL
+- cultivator `eyeTracking.enabled:false`，idle 非 follow 图 → 渲染走 **`<img>`**（见 `src/renderer.js` `needsObjectChannel`）。
+- `<img>` 内嵌 SVG 的 **CSS `@keyframes` 不播放**；只有 **SMIL**（`<animate>` / `<animateTransform>`）会动。
+- 教训：曾以为 idle 的 `breathe` / `halo-breathe` CSS 在桌宠上生效，实际静止。功德结界与 idle 本体微动一律 SMIL；CSS 仅作 object 通道（preview/petdex）fallback。
+- 验收页：`assets/source/cultivator/idle-aura-img-qa.html`（强制 `<img>` 加载），不要只看 state-viewer 的 `<object>` 通道——那会让 CSS 假性「通过」。
 
 ---
 
@@ -127,6 +139,7 @@
   离屏就能核对 FX 是否读得出，不依赖真机录屏。
 - **浅底 + 深底两种背景**都要看，才能同时抓到「假透明白底」和「近黑残留」。
 - **Cursor 看不了 SVG**：验收一律走浏览器 preview HTML / 冻帧截图。
+- **idle 结界必须用 img QA 页**：`idle-aura-img-qa.html`；state-viewer 默认 object 通道会掩盖「CSS 不动」的问题。
 - **桌宠进程会写回 prefs**：手改 `clawd-prefs.json` 调境界前先**完全退出 Clawd**，否则一启动被写回；
   调试优先用 Settings Theme 页的 stage select +「敲木鱼」按钮，别依赖 `debugStageId`。
 - **临时/调试产物集中在 `candidates/`**，验收通过才拷 `generated/`；`candidates/` 长期只留各阶段
@@ -141,5 +154,5 @@
 3. **划清 AI/代码边界**：身份结构烤进图，运动氛围留给代码；同一元素在各状态要么都在要么都不在。
 4. **锚点思维**：一致性来自「锁定一个稳定锚」（身体高度 / 坐底基线 / idle 参考图），不是逐个体调。
 5. **目标尺寸验收**：小尺寸远观的东西，必须在最终尺寸下判「看不看得见」。
-6. **单一真相源**：约束集中在 `STAGE_PROMPTS` 等常量、FX 集中在 `KNOCK_FX_TIER`，改一处、同步文档。
+6. **单一真相源**：约束集中在 `STAGE_PROMPTS` 等常量、敲击 FX 集中在 `KNOCK_FX_TIER`、idle 结界集中在 `IDLE_AURA_TIER`，改一处、同步文档。
 7. **透明底默认不可信**：AI 的「透明」经常是假的，去背 + 双背景核对是必查项。

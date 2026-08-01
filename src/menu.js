@@ -280,6 +280,12 @@ module.exports = function initMenu(ctx) {
           if (typeof ctx.openDashboard === "function") ctx.openDashboard();
         },
       },
+      {
+        label: t("openGames"),
+        click: () => {
+          if (typeof ctx.openGames === "function") ctx.openGames();
+        },
+      },
       buildPermissionAutomationMenuItem(),
     ];
 
@@ -491,6 +497,12 @@ module.exports = function initMenu(ctx) {
         label: t("openDashboard"),
         click: () => {
           if (typeof ctx.openDashboard === "function") ctx.openDashboard();
+        },
+      },
+      {
+        label: t("openGames"),
+        click: () => {
+          if (typeof ctx.openGames === "function") ctx.openGames();
         },
       },
       {

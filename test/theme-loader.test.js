@@ -897,6 +897,7 @@ describe("theme-loader capability metadata", () => {
         params: theme._capabilities.meritCultivator.params,
         stages: null,
       },
+      renderBackend: "svg",
     });
     assert.strictEqual(theme._capabilities.meritCultivator.enabled, false);
   });
