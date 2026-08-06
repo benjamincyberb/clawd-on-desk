@@ -20,6 +20,8 @@
     "test": "node test/run-tests.js",
     "audit:assets": "node scripts/audit-repository-assets.js",
     "create-theme": "node scripts/create-theme.js",
+    "create-game": "node scripts/create-game.js",
+    "validate:game": "node scripts/validate-game.js",
     "generate:cultivator-assets": "node scripts/generate-cultivator-assets.js",
     "check:cultivator-assets": "node scripts/generate-cultivator-assets.js --check",
     "generate:naruto-stub-assets": "node scripts/generate-naruto-stub-assets.js",
@@ -70,6 +72,7 @@
     "split:naruto-working": "PYTHONPATH=.tools/pillow python3 scripts/split-naruto-working-sheets.py",
     "vendor:pixi": "mkdir -p src/vendor && cp node_modules/pixi.js/dist/pixi.min.js src/vendor/pixi.min.js && cp node_modules/pixi.js/dist/packages/unsafe-eval.min.js src/vendor/pixi-unsafe-eval.js && cp node_modules/pixi.js/LICENSE src/vendor/PIXI-LICENSE",
     "vendor:rive": "node scripts/vendor-rive.js",
+    "vendor:phaser": "node scripts/vendor-phaser.js",
     "start:pixi-spike": "CLAWD_PIXI_SPIKE=1 node launch.js",
     "start:rive-spike": "CLAWD_RIVE_SPIKE=1 node launch.js",
     "smoke:pixi-spike": "node scripts/smoke-pixi-spike.js",
@@ -171,6 +174,7 @@
       "extensions/**/*",
       "agents/**/*",
       "themes/**/*",
+      "games/**/*",
       "pwa/**/*"
     ],
     "asarUnpack": [
@@ -180,6 +184,7 @@
       "extensions/**/*",
       "agents/**/*",
       "themes/**/*",
+      "games/**/*",
       "node_modules/jsonc-parser/**/*"
     ],
     "extraResources": [
@@ -204,6 +209,7 @@
     "@rive-app/canvas-single": "^2.39.1",
     "electron": "^41.10.2",
     "electron-builder": "^26.8.1",
+    "phaser": "^4.2.1",
     "pixi.js": "8.15.0"
   },
   "dependencies": {

@@ -189,6 +189,7 @@
       badges.push(t("themeCapabilityMerit"));
     }
     if (caps.renderBackend === "rive") badges.push(t("themeCapabilityRive"));
+    if (caps.renderBackend === "sandbox") badges.push(t("themeCapabilitySandbox"));
     return badges;
   }
 
@@ -1050,6 +1051,10 @@
     let message = typeof formatter === "function" ? formatter(name) : String(formatter);
     if (result && (result.rive || result.renderBackend === "rive")) {
       const warn = t("toastUserThemeZipImportRiveWarning");
+      if (warn) message = `${message} ${warn}`;
+    }
+    if (result && (result.sandbox || result.renderBackend === "sandbox")) {
+      const warn = t("toastUserThemeZipImportSandboxWarning");
       if (warn) message = `${message} ${warn}`;
     }
     return message;

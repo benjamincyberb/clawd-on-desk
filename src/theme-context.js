@@ -102,7 +102,9 @@ function createThemeContext(theme, options = {}) {
       ) ? (theme.customization.accessories || null) : null,
       objectScale: theme.objectScale,
       transitions: theme.transitions || {},
-      renderBackend: theme.renderBackend === "rive" ? "rive" : "svg",
+      renderBackend: theme.renderBackend === "rive"
+        ? "rive"
+        : (theme.renderBackend === "sandbox" ? "sandbox" : "svg"),
       rive: theme.rive
         ? {
           file: theme.rive.file,
@@ -119,6 +121,13 @@ function createThemeContext(theme, options = {}) {
           assetUrl: theme.rive.file && getRendererSourceAssetsPath()
             ? `${getRendererSourceAssetsPath().replace(/\/$/, "")}/${theme.rive.file}`
             : null,
+        }
+        : null,
+      sandbox: theme.sandbox
+        ? {
+          entry: theme.sandbox.entry,
+          engine: theme.sandbox.engine,
+          network: theme.sandbox.network === true,
         }
         : null,
     };

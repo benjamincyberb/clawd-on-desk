@@ -148,9 +148,16 @@ const { createMeritBridge } = require("./merit-bridge");
 const gameLoader = require("./game-loader");
 const gameStore = require("./game-store");
 const gameHost = require("./game-host");
+const petSandbox = require("./pet-sandbox");
+const {
+  resolveRuntimeRenderBackend,
+  resolveTrustedEntryFile,
+  isSandboxBackend,
+} = require("./render-backends");
 const { isGameEnabled } = require("./games-settings");
-// Custom clawd-game: scheme privileges must be registered before app ready.
+// Custom clawd-game / clawd-pet scheme privileges must be registered before app ready.
 try { gameHost.registerSchemesBeforeReady(); } catch (_) { /* ignore */ }
+try { petSandbox.registerSchemesBeforeReady(); } catch (_) { /* ignore */ }
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
@@ -683,6 +690,7 @@ themeRuntime = createThemeRuntime({
   getAnimationOverridesRuntime: () => animationOverridesMain,
   getFadeSequencer: () => themeFadeSequencer,
   getRenderEntryPathForTheme: (theme) => resolveRenderEntryPath(theme),
+  recreateRenderWindowForTheme: (theme) => recreateRenderWindowForTheme(theme),
   getPetWindowBounds,
   applyPetWindowBounds,
   computeFinalDragBounds,
@@ -1183,6 +1191,11 @@ function bringPetToPrimaryDisplay() {
 }
 
 function sendToRenderer(channel, ...args) {
+  // Sandbox code themes: relay allowlisted channels as pet:event; drop the rest.
+  if (petSandbox.isActiveSandbox()) {
+    petSandbox.relayToSandbox(channel, args);
+    return;
+  }
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
 }
 function sendToHitWin(channel, ...args) {
@@ -1719,6 +1732,24 @@ let showDashboard = () => {};
 let broadcastDashboardSessionSnapshot = () => {};
 let sendDashboardI18n = () => {};
 
+function openGamesWindow() {
+  // Open Settings so the user can pick/launch from the Games tab.
+  // If exactly one enabled valid game exists, launch it directly.
+  try {
+    const gamesPrefs = _settingsController.get("games");
+    const games = gameLoader.listGamesWithMetadata().filter(
+      (g) => g.valid && isGameEnabled(gamesPrefs, g.id)
+    );
+    if (games.length === 1) {
+      gameHost.launchGame(games[0].id);
+      return;
+    }
+  } catch (err) {
+    console.warn("Clawd: openGames launch probe failed:", err && err.message);
+  }
+  settingsWindowRuntime.open();
+}
+
 // Forward hook for the #329 updater scheduler. State/mini ctxs reference
 // this via notifyUpdaterSilentExit; the actual implementation is wired
 // after the updater module is constructed below.
@@ -1756,34 +1787,109 @@ function buildRendererThemeConfig() {
 }
 
 // Render entry: env spikes override; otherwise follow active theme.renderBackend.
-// Theme switches that change backend use loadFile (see theme-fade-sequencer);
+// Theme switches that change backend use loadFile / loadURL (see theme-fade-sequencer);
 // same-backend switches keep webContents.reload().
 const { resolveThemeRenderBackend } = require("./theme-schema");
 
 function resolveRenderBackend(theme) {
-  const explicit = String(process.env.CLAWD_RENDER_BACKEND || "").trim().toLowerCase();
-  if (explicit === "svg" || explicit === "pixi" || explicit === "rive") return explicit;
-  if (process.env.CLAWD_RIVE_SPIKE === "1") return "rive";
-  if (process.env.CLAWD_PIXI_SPIKE === "1") return "pixi";
   const active = theme || (typeof getActiveTheme === "function" ? getActiveTheme() : null);
-  return resolveThemeRenderBackend(active);
+  return resolveRuntimeRenderBackend(active);
 }
 
 function resolveRenderEntryFile(theme) {
   const backend = resolveRenderBackend(theme);
+  if (isSandboxBackend(backend)) return null;
+  const file = resolveTrustedEntryFile(backend);
   if (backend === "pixi") {
-    try { console.log("[pixi-demo] render entry = index-pixi.html"); } catch {}
-    return "index-pixi.html";
+    try { console.log("[pixi-demo] render entry =", file); } catch {}
+  } else if (backend === "phaser") {
+    try { console.log("[phaser] render entry =", file); } catch {}
+  } else if (backend === "rive") {
+    try { console.log("[rive] render entry =", file); } catch {}
   }
-  if (backend === "rive") {
-    try { console.log("[rive] render entry = index-rive.html"); } catch {}
-    return "index-rive.html";
-  }
-  return "index.html";
+  return file || "index.html";
 }
 
+/**
+ * Returns either a filesystem path string (trusted entries) or
+ * { url } / { file } for theme-runtime / fade sequencer.
+ */
 function resolveRenderEntryPath(theme) {
+  const backend = resolveRenderBackend(theme);
+  if (isSandboxBackend(backend)) {
+    const active = theme || getActiveTheme();
+    petSandbox.setActiveTheme(active);
+    const url = petSandbox.buildSandboxEntryUrl(active);
+    return url ? { url } : null;
+  }
+  petSandbox.clearActive();
   return path.join(__dirname, resolveRenderEntryFile(theme));
+}
+
+function syncPetSandboxForTheme(theme) {
+  const backend = resolveRenderBackend(theme);
+  if (isSandboxBackend(backend)) {
+    petSandbox.setActiveTheme(theme);
+  } else {
+    petSandbox.clearActive();
+  }
+}
+
+/**
+ * Destroy and recreate the pet render window when crossing the sandbox
+ * boundary (trusted preload ↔ sandboxed clawdPet preload). webPreferences
+ * cannot be changed on an existing BrowserWindow.
+ */
+function recreateRenderWindowForTheme(theme) {
+  const bounds = petWindowRuntime.getPetWindowBounds
+    ? petWindowRuntime.getPetWindowBounds()
+    : null;
+  const size = bounds
+    ? { width: bounds.width, height: bounds.height }
+    : { width: 256, height: 256 };
+  const initialWindowBounds = bounds
+    ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+    : { x: 0, y: 0, width: size.width, height: size.height };
+
+  const oldWin = win;
+  syncPetSandboxForTheme(theme);
+  const backend = resolveRenderBackend(theme);
+  const sandboxMode = isSandboxBackend(backend);
+  const sandboxEntry = sandboxMode ? petSandbox.buildSandboxEntryUrl(theme) : null;
+
+  petWindowRuntime.createRenderWindow({
+    BrowserWindow,
+    size,
+    initialWindowBounds,
+    initialVirtualBounds: bounds || initialWindowBounds,
+    preloadPath: path.join(__dirname, "preload.js"),
+    loadFilePath: sandboxMode ? null : path.join(__dirname, resolveRenderEntryFile(theme)),
+    loadUrl: sandboxEntry,
+    sandboxMode,
+    sandboxWebPreferences: sandboxMode
+      ? petSandbox.getSandboxWebPreferences(
+        path.join(__dirname, "pet-sandbox-preload.js"),
+        buildRendererThemeConfig()
+      )
+      : null,
+    themeConfig: buildRendererThemeConfig(),
+    setRenderWindow: (createdWindow) => { win = createdWindow; },
+    isQuitting: () => isQuitting,
+    applyDockVisibility,
+  });
+
+  if (oldWin && !oldWin.isDestroyed()) {
+    try { oldWin.destroy(); } catch { /* ignore */ }
+  }
+
+  if (win && !win.isDestroyed()) {
+    win.on("move", () => petWindowRuntime.syncFloatingWindowsAfterPetBoundsChange());
+    win.on("resize", () => petWindowRuntime.syncFloatingWindowsAfterPetBoundsChange());
+    win.on("render-process-gone", (_e, details) => {
+      safeConsoleError("renderWin renderer crashed:", details.reason);
+      petWindowRuntime.reloadWindowWebContents(win, { crashKey: "renderWin", details });
+    });
+  }
 }
 
 const _stateCtx = {
@@ -1847,6 +1953,13 @@ const _stateCtx = {
     reconcilePowerSaveBlocker();
     broadcastDashboardSessionSnapshot(snapshot);
     broadcastSessionHudSnapshot(snapshot);
+    try {
+      gameHost.pushAgentSnapshot({
+        state: snapshot && snapshot.primaryState ? snapshot.primaryState : (snapshot && snapshot.state),
+        sessions: snapshot && Array.isArray(snapshot.sessions) ? snapshot.sessions : [],
+        merit: typeof meritBridge?.getStatus === "function" ? meritBridge.getStatus() : undefined,
+      });
+    } catch { /* ignore */ }
     repositionFloatingBubbles();
     // R1a: best-effort completion notifications. Must never throw or block the
     // broadcast — the companion computes synchronously and fires sends async.
@@ -3608,6 +3721,7 @@ const _menuCtx = {
   checkForUpdates: (...args) => checkForUpdates(...args),
   getUpdateMenuItem: () => getUpdateMenuItem(),
   openDashboard: () => showDashboard(),
+  openGames: () => openGamesWindow(),
   launchClaudeSession: (mode, cwd, sessionId) => launchClaudeSession(mode, cwd, sessionId),
   newSessionWithFolder: async (t) => {
     const parent = win && !win.isDestroyed() ? win : null;
@@ -4041,6 +4155,25 @@ registerSettingsIpc({
   },
   aboutHeroSvgPath: path.join(__dirname, "..", "assets", "svg", "clawd-about-hero.svg"),
   getLanWsServer: () => _lanWss,
+  listGames: () => {
+    const gamesPrefs = _settingsController.get("games");
+    return gameLoader.listGamesWithMetadata().map((g) => ({
+      ...g,
+      enabled: isGameEnabled(gamesPrefs, g.id),
+    }));
+  },
+  launchGame: (gameId) => {
+    const gamesPrefs = _settingsController.get("games");
+    if (!isGameEnabled(gamesPrefs, gameId)) {
+      return { status: "error", message: "game is disabled" };
+    }
+    try {
+      return gameHost.launchGame(gameId);
+    } catch (err) {
+      return { status: "error", message: (err && err.message) || "launch failed" };
+    }
+  },
+  clearGameSaves: (gameId) => gameStore.clearAllForGame(gameId),
 });
 
 registerSessionIpc({
@@ -4126,13 +4259,27 @@ function createWindow() {
     restoreMiniFromPrefs: (prefsSnapshot, pixelSize) => _mini.restoreFromPrefs(prefsSnapshot, pixelSize),
   });
 
+  const initialBackend = resolveRenderBackend(getActiveTheme());
+  const sandboxMode = isSandboxBackend(initialBackend);
+  syncPetSandboxForTheme(getActiveTheme());
+  const sandboxEntry = sandboxMode
+    ? petSandbox.buildSandboxEntryUrl(getActiveTheme())
+    : null;
   petWindowRuntime.createRenderWindow({
     BrowserWindow,
     size,
     initialWindowBounds,
     initialVirtualBounds,
     preloadPath: path.join(__dirname, "preload.js"),
-    loadFilePath: path.join(__dirname, resolveRenderEntryFile()),
+    loadFilePath: sandboxMode ? null : path.join(__dirname, resolveRenderEntryFile()),
+    loadUrl: sandboxEntry,
+    sandboxMode,
+    sandboxWebPreferences: sandboxMode
+      ? petSandbox.getSandboxWebPreferences(
+        path.join(__dirname, "pet-sandbox-preload.js"),
+        buildRendererThemeConfig()
+      )
+      : null,
     themeConfig: buildRendererThemeConfig(),
     setRenderWindow: (createdWindow) => { win = createdWindow; },
     isQuitting: () => isQuitting,
@@ -4639,6 +4786,91 @@ if (!gotTheLock) {
     // First-run only: seed UI language from the device locale, before createWindow
     // so the very first menu/tray render is already in the user's language.
     hydrateFreshInstallLanguage();
+    try {
+      gameHost.init({
+        getAgentSnapshot: () => {
+          try {
+            const snap = _state && typeof _state.buildSessionSnapshot === "function"
+              ? _state.buildSessionSnapshot()
+              : {};
+            return {
+              state: snap && (snap.primaryState || snap.state) || "idle",
+              sessions: snap && Array.isArray(snap.sessions) ? snap.sessions : [],
+              merit: meritBridge && typeof meritBridge.getStatus === "function"
+                ? meritBridge.getStatus()
+                : undefined,
+            };
+          } catch {
+            return { state: "idle", sessions: [] };
+          }
+        },
+        getThemeInfo: () => {
+          try {
+            const theme = getActiveTheme();
+            return {
+              themeId: theme && theme._id ? theme._id : "",
+              renderBackend: resolveThemeRenderBackend(theme),
+              name: theme && theme.name ? theme.name : "",
+            };
+          } catch {
+            return { themeId: "", renderBackend: "svg", name: "" };
+          }
+        },
+        getIconPath: () => settingsWindowRuntime.getIconPath(),
+        onPetEvent: (evt) => {
+          try {
+            console.log("[game] pet event", evt && evt.type, evt && evt.gameId);
+          } catch { /* ignore */ }
+        },
+      });
+    } catch (err) {
+      console.warn("Clawd: game host init failed:", err && err.message);
+    }
+    try {
+      petSandbox.init({
+        getRenderWindow: () => win,
+        getAgentSnapshot: () => {
+          try {
+            const snap = _state && typeof _state.buildSessionSnapshot === "function"
+              ? _state.buildSessionSnapshot()
+              : {};
+            return {
+              state: snap && (snap.primaryState || snap.state) || "idle",
+              sessions: snap && Array.isArray(snap.sessions) ? snap.sessions : [],
+            };
+          } catch {
+            return { state: "idle", sessions: [] };
+          }
+        },
+        onPetEvent: (evt) => {
+          try {
+            console.log("[pet-sandbox] pet event", evt && evt.type, evt && evt.themeId);
+          } catch { /* ignore */ }
+        },
+        onReady: () => {
+          try {
+            if (typeof syncRendererStateAfterLoad === "function") {
+              syncRendererStateAfterLoad({ includeStartupRecovery: false });
+            }
+          } catch { /* ignore */ }
+        },
+      });
+      syncPetSandboxForTheme(getActiveTheme());
+    } catch (err) {
+      console.warn("Clawd: pet sandbox init failed:", err && err.message);
+    }
+    // Dev/demo: CLAWD_LAUNCH_GAME=<id> opens that sandbox game shortly after boot.
+    const launchGameId = String(process.env.CLAWD_LAUNCH_GAME || "").trim();
+    if (launchGameId) {
+      setTimeout(() => {
+        try {
+          const result = gameHost.launchGame(launchGameId);
+          console.log("[game] CLAWD_LAUNCH_GAME", launchGameId, result && result.status);
+        } catch (err) {
+          console.warn("Clawd: CLAWD_LAUNCH_GAME failed:", err && err.message);
+        }
+      }, 1800);
+    }
     try {
       await initializeRemoteSshInstallationIdentity();
     } catch (err) {

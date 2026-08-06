@@ -576,4 +576,107 @@ describe("theme schema rive backend", () => {
     assert.strictEqual(cfg.stateLevels.working, 1);
     assert.strictEqual(cfg.stateLevels.idle, 0);
   });
+
+  it("derives hitBoxes from contentBox for rive themes that omit hitBoxes", () => {
+    const merged = schema.mergeDefaults(validRiveTheme({
+      viewBox: { x: 0, y: 0, width: 256, height: 256 },
+      layout: {
+        contentBox: { x: 48, y: 32, width: 160, height: 192 },
+        centerX: 128,
+        baselineY: 224,
+        visibleHeightRatio: 0.75,
+        baselineBottomRatio: 0.05,
+      },
+    }), "rive-hit", false);
+    const expected = { x: 48, y: 32, w: 160, h: 192 };
+    assert.deepStrictEqual(merged.hitBoxes.default, expected);
+    assert.deepStrictEqual(merged.hitBoxes.sleeping, expected);
+    assert.deepStrictEqual(merged.hitBoxes.wide, expected);
+  });
+
+  it("keeps authored rive hitBoxes and falls back to viewBox without contentBox", () => {
+    const authored = schema.mergeDefaults(validRiveTheme({
+      viewBox: { x: 0, y: 0, width: 256, height: 256 },
+      hitBoxes: { default: { x: 10, y: 20, w: 30, h: 40 } },
+    }), "rive-authored-hit", false);
+    assert.deepStrictEqual(authored.hitBoxes.default, { x: 10, y: 20, w: 30, h: 40 });
+
+    const fromViewBox = schema.mergeDefaults(validRiveTheme({
+      viewBox: { x: 0, y: 0, width: 256, height: 256 },
+    }), "rive-vb-hit", false);
+    assert.deepStrictEqual(fromViewBox.hitBoxes.default, { x: 0, y: 0, w: 256, h: 256 });
+  });
+});
+
+describe("theme schema sandbox backend", () => {
+  function validSandboxTheme(overrides = {}) {
+    return validThemeJson({
+      renderBackend: "sandbox",
+      sandbox: { entry: "index.html", engine: "phaser", network: false },
+      eyeTracking: { enabled: false },
+      sleepSequence: { mode: "direct" },
+      states: {
+        idle: ["_sandbox"],
+        thinking: ["_sandbox"],
+        working: ["_sandbox"],
+        sleeping: { fallbackTo: "idle" },
+      },
+      layout: {
+        contentBox: { x: 48, y: 32, width: 160, height: 192 },
+        centerX: 128,
+        baselineY: 224,
+        visibleHeightRatio: 0.75,
+        baselineBottomRatio: 0.05,
+      },
+      ...overrides,
+    });
+  }
+
+  it("accepts sandbox themes and normalizes config", () => {
+    const raw = validSandboxTheme();
+    assert.deepStrictEqual(schema.validateTheme(raw), []);
+    const merged = schema.mergeDefaults(raw, "sandbox-demo", false);
+    assert.strictEqual(merged.renderBackend, "sandbox");
+    assert.ok(merged.sandbox);
+    assert.strictEqual(merged.sandbox.entry, "index.html");
+    assert.strictEqual(merged.sandbox.engine, "phaser");
+    assert.strictEqual(merged.sandbox.network, false);
+    assert.strictEqual(merged.eyeTracking.enabled, false);
+    assert.strictEqual(merged.customization.petTint, false);
+    assert.strictEqual(schema.buildCapabilities(merged).renderBackend, "sandbox");
+    assert.strictEqual(schema.buildCapabilities(merged).petTint, false);
+  });
+
+  it("rejects missing entry, path traversal entry, and bad engine", () => {
+    assert.ok(schema.validateTheme(validSandboxTheme({
+      sandbox: { entry: "" },
+    })).some((e) => e.includes("sandbox.entry")));
+
+    assert.ok(schema.validateTheme(validSandboxTheme({
+      sandbox: { entry: "../evil.html", engine: "phaser" },
+    })).some((e) => e.includes("sandbox.entry") || e.includes("basename") || e.includes(".html")));
+
+    // basenameOnly strips ../ so entry becomes evil.html — still .html, so
+    // also reject unknown engines explicitly.
+    assert.ok(schema.validateTheme(validSandboxTheme({
+      sandbox: { entry: "index.html", engine: "doom" },
+    })).some((e) => e.includes("sandbox.engine")));
+  });
+
+  it("rejects eyeTracking with sandbox", () => {
+    assert.ok(schema.validateTheme(validSandboxTheme({
+      eyeTracking: { enabled: true, states: ["idle"] },
+    })).some((e) => e.includes("eyeTracking")));
+  });
+
+  it("derives hitBoxes from contentBox and skips state asset collection", () => {
+    const merged = schema.mergeDefaults(validSandboxTheme(), "sandbox-hit", false);
+    assert.deepStrictEqual(merged.hitBoxes.default, { x: 48, y: 32, w: 160, h: 192 });
+    assert.deepStrictEqual(schema.collectRequiredAssetFiles(merged), []);
+  });
+
+  it("infers sandbox backend from sandbox.entry when renderBackend omitted", () => {
+    const raw = validSandboxTheme({ renderBackend: undefined });
+    assert.strictEqual(schema.resolveThemeRenderBackend(raw), "sandbox");
+  });
 });

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "name": "Merit Cultivator",
+  "version": "1.0.0",
+  "author": "Clawd",
+  "description": "Built-in sample: tap to accumulate merit, reacts to agent state via clawd.game.v1",
+  "entry": "index.html",
+  "window": { "width": 720, "height": 480, "resizable": true },
+  "capabilities": {
+    "agentFeed": true,
+    "petEvents": true
+  },
+  "engine": "vanilla"
+}

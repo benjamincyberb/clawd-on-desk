@@ -9,6 +9,7 @@ const {
   sanitizeSvg,
   collectSafeRasterRefs,
 } = require("./theme-sanitizer");
+const { isAllowedSandboxAssetPath } = require("./render-backends");
 
 function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -244,8 +245,85 @@ function resolveExternalAssetsDir(themeId, themeDir, opts = {}) {
   return cacheDir;
 }
 
+/**
+ * Copy allowlisted sandbox theme files (html/js/css/images/…) into theme-cache.
+ * Skips SVG sanitization — sandbox themes are code packages served via clawd-pet://.
+ * Returns the cache root used as the protocol package root.
+ */
+function resolveSandboxThemeRoot(themeId, themeDir, opts = {}) {
+  const themeCacheDir = opts && opts.themeCacheDir;
+  if (!themeCacheDir || !themeDir) return themeDir;
+
+  const cacheRoot = path.join(themeCacheDir, themeId, "sandbox");
+  fs.mkdirSync(cacheRoot, { recursive: true });
+
+  const copied = new Set();
+  function walk(relDir) {
+    const absDir = relDir ? path.join(themeDir, relDir) : themeDir;
+    let entries;
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const name = entry.name;
+      if (!name || name === "." || name === ".." || name.startsWith(".")) continue;
+      const rel = relDir ? `${relDir}/${name}` : name;
+      const abs = path.join(absDir, name);
+      const resolved = path.resolve(abs);
+      if (!isPathInsideDir(themeDir, resolved)) continue;
+      if (entry.isDirectory()) {
+        walk(rel.replace(/\\/g, "/"));
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const normRel = rel.replace(/\\/g, "/");
+      if (!isAllowedSandboxAssetPath(normRel)) continue;
+      const dest = path.join(cacheRoot, ...normRel.split("/"));
+      try {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(abs, dest);
+        copied.add(normRel);
+      } catch (err) {
+        console.warn(`[theme-loader] sandbox cache copy failed for ${normRel}:`, err && err.message);
+      }
+    }
+  }
+  walk("");
+
+  // Prune stale cached files that are no longer in the source package.
+  function prune(relDir) {
+    const absDir = relDir ? path.join(cacheRoot, relDir) : cacheRoot;
+    let entries;
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
+      const abs = path.join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        prune(rel.replace(/\\/g, "/"));
+        try {
+          if (fs.readdirSync(abs).length === 0) fs.rmdirSync(abs);
+        } catch { /* ignore */ }
+        continue;
+      }
+      if (!copied.has(rel.replace(/\\/g, "/"))) {
+        try { fs.rmSync(abs, { force: true }); } catch { /* ignore */ }
+      }
+    }
+  }
+  prune("");
+
+  return cacheRoot;
+}
+
 module.exports = {
   resolveExternalAssetsDir,
+  resolveSandboxThemeRoot,
   externalAssetsSourceDir,
   isPathInsideDir,
   emptyCacheMeta,

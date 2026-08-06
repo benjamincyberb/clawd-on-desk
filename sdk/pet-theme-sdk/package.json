@@ -1,0 +1,7 @@
+{
+  "name": "@clawd/pet-theme-sdk",
+  "version": "1.0.0",
+  "description": "Helpers for clawd-pet.v1 sandboxed desk-pet themes",
+  "main": "src/index.js",
+  "license": "MIT"
+}

@@ -41,6 +41,13 @@
     "baselineBottomRatio": 0.05
   },
 
+  "hitBoxes": {
+    "_comment": "viewBox units — cover the character so drag/click work. Do NOT reuse Clawd SVG defaults (~17×12).",
+    "default": { "x": 48, "y": 32, "w": 160, "h": 192 },
+    "sleeping": { "x": 48, "y": 32, "w": 160, "h": 192 },
+    "wide": { "x": 48, "y": 32, "w": 160, "h": 192 }
+  },
+
   "eyeTracking": {
     "_comment": "Not supported with renderBackend rive — keep disabled.",
     "enabled": false,

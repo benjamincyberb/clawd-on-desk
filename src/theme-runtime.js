@@ -37,6 +37,7 @@ function createThemeRuntime(options = {}) {
   const getAnimationOverridesRuntime = options.getAnimationOverridesRuntime || (() => null);
   const getFadeSequencer = options.getFadeSequencer || (() => null);
   const getRenderEntryPathForTheme = options.getRenderEntryPathForTheme || (() => null);
+  const recreateRenderWindowForTheme = options.recreateRenderWindowForTheme || null;
   const getPetWindowBounds = options.getPetWindowBounds || (() => null);
   const applyPetWindowBounds = options.applyPetWindowBounds || (() => null);
   const computeFinalDragBounds = options.computeFinalDragBounds || (() => null);
@@ -235,12 +236,27 @@ function createThemeRuntime(options = {}) {
 
     const previousBackend = resolveThemeRenderBackend(activeTheme);
     const nextBackend = resolveThemeRenderBackend(newTheme);
+    const crossesSandboxBoundary = (
+      (previousBackend === "sandbox") !== (nextBackend === "sandbox")
+    );
     let renderLoadFilePath = null;
-    if (previousBackend !== nextBackend) {
+    let renderLoadUrl = null;
+    let recreateForSandbox = false;
+    if (crossesSandboxBoundary && typeof recreateRenderWindowForTheme === "function") {
+      recreateForSandbox = true;
+    } else if (previousBackend !== nextBackend || nextBackend === "sandbox") {
       try {
-        renderLoadFilePath = getRenderEntryPathForTheme(newTheme) || null;
+        const entry = getRenderEntryPathForTheme(newTheme) || null;
+        if (entry && typeof entry === "object") {
+          renderLoadUrl = entry.url || null;
+          renderLoadFilePath = entry.file || null;
+        } else if (typeof entry === "string") {
+          if (entry.startsWith("clawd-pet://")) renderLoadUrl = entry;
+          else renderLoadFilePath = entry;
+        }
       } catch {
         renderLoadFilePath = null;
+        renderLoadUrl = null;
       }
     }
 
@@ -292,6 +308,10 @@ function createThemeRuntime(options = {}) {
       onReloadFinished: () => finishThemeReload(),
       onFallback: () => finishThemeReload(),
       renderLoadFilePath,
+      renderLoadUrl,
+      recreateRenderWindow: recreateForSandbox
+        ? () => recreateRenderWindowForTheme(newTheme)
+        : null,
     });
 
     flushRuntimeStateToPrefs();

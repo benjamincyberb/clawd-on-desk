@@ -80,6 +80,8 @@ Copilot CLI 同步走 `<COPILOT_HOME 或 ~/.copilot>/hooks/hooks.json`，marker-
 - `docs/guides/copilot-setup.md`：Copilot CLI 自动同步说明、`COPILOT_HOME` 兼容性、手动配置备选模板
 - `docs/guides/state-mapping.md`：状态 → 动画权威表
 - `docs/guides/guide-theme-creation.md`：主题作者指南
+- `docs/guides/guide-game-creation.md` / `docs/guides/game-api-v1.md`：小游戏包与 `clawd.game.v1` 契约
+- `docs/guides/package-import-routing.md`：导入时主题/游戏、SVG/Rive 自动路由（不弹选择；歧义 fail closed）
 - `docs/guides/setup-guide.md`：安装、远程 SSH、各 agent 接入
 - `docs/guides/custom-agent-http.md`：自定义 HTTP Agent 的 state-only 接入合约和动态端口发现
 - `docs/guides/known-limitations.md`：用户向已知限制

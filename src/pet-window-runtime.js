@@ -654,6 +654,16 @@ function createPetWindowRuntime(options = {}) {
     const isQuitting = typeof optionsArg.isQuitting === "function" ? optionsArg.isQuitting : () => false;
     const size = optionsArg.size;
     const initialWindowBounds = optionsArg.initialWindowBounds;
+    const sandboxMode = !!optionsArg.sandboxMode;
+    const webPreferences = sandboxMode && optionsArg.sandboxWebPreferences
+      ? optionsArg.sandboxWebPreferences
+      : {
+        preload: optionsArg.preloadPath,
+        backgroundThrottling: false,
+        additionalArguments: [
+          "--theme-config=" + JSON.stringify(optionsArg.themeConfig),
+        ],
+      };
     const renderWin = new BrowserWindow({
       width: size.width,
       height: size.height,
@@ -669,13 +679,7 @@ function createPetWindowRuntime(options = {}) {
       enableLargerThanScreen: true,
       ...(isLinux ? { type: linuxWindowType } : {}),
       ...(isMac ? { type: "panel", roundedCorners: false } : {}),
-      webPreferences: {
-        preload: optionsArg.preloadPath,
-        backgroundThrottling: false,
-        additionalArguments: [
-          "--theme-config=" + JSON.stringify(optionsArg.themeConfig),
-        ],
-      },
+      webPreferences,
     });
 
     if (typeof optionsArg.setRenderWindow === "function") {
@@ -715,7 +719,13 @@ function createPetWindowRuntime(options = {}) {
       renderWin.on("query-session-end", flushForSessionEnd);
       renderWin.on("session-end", flushForSessionEnd);
     }
-    renderWin.loadFile(optionsArg.loadFilePath);
+    if (sandboxMode && typeof optionsArg.loadUrl === "string" && optionsArg.loadUrl) {
+      renderWin.loadURL(optionsArg.loadUrl).catch((err) => {
+        console.warn("Clawd: sandbox pet loadURL failed:", err && err.message);
+      });
+    } else {
+      renderWin.loadFile(optionsArg.loadFilePath);
+    }
     // file:// zoom propagates partition-wide and persists across restarts;
     // builds that briefly used setZoomFactor for textScale may have left a
     // non-1 factor behind. Reset it from the first window to load so the pet

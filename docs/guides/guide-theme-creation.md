@@ -2,6 +2,69 @@
 
 Install a downloaded Clawd theme, or create your own desktop pet theme with custom characters and animations.
 
+**Recommended path for new pets:** Rive (`.riv` + `theme.json`). SVG/GIF/PNG themes remain supported as a legacy backend. For maximum flexibility (arbitrary Phaser/HTML/JS as the pet itself), use a **sandbox code theme** (`renderBackend: "sandbox"`).
+
+**How Clawd tells theme vs game / SVG vs Rive vs sandbox apart on import:** see [`package-import-routing.md`](./package-import-routing.md) (deterministic rules, fail closed on ambiguity).
+
+## Sandbox / Code Themes (Phaser)
+
+Sandbox themes put real code (typically Phaser) **on the desk-pet window itself**, not in a separate game window.
+
+Official templates vendor **Phaser 4.x** (`npm run vendor:phaser` syncs `phaser.min.js` into theme / game / spike vendor folders). WebGL is required; Canvas 2D is not a supported fallback.
+
+Security model (same idea as games):
+
+- Theme HTML/JS runs with `sandbox: true` + `contextIsolation`
+- **No** `electronAPI` / Node / filesystem
+- Narrow bridge: `window.clawdPet` (`clawd-pet.v1`)
+- Served via `clawd-pet://` with path-traversal guards + CSP (`unsafe-eval` for Phaser)
+
+Package shape:
+
+```text
+my-orbit-pet/
+  theme.json          ← renderBackend: "sandbox"
+  index.html          ← sandbox.entry
+  main.js
+  vendor/
+    phaser.min.js
+    clawd-pet-sdk.js
+```
+
+`theme.json` essentials:
+
+```json
+{
+  "renderBackend": "sandbox",
+  "sandbox": { "entry": "index.html", "engine": "phaser", "network": false }
+}
+```
+
+Bridge events (see `sdk/pet-theme-sdk/README.md`):
+
+| Inbound | Meaning |
+|---------|---------|
+| `state` | Agent display state changed |
+| `cursor` | Pointer in pet-window CSS pixels |
+| `click` / `drag-start` / `drag-end` | Hit-window interactions |
+| `dnd` / `mini` | Mode flags |
+
+Outbound: `ready()`, `getInfo()`, `getAgentSnapshot()`, `emitPetEvent`, `storage`.
+
+Phase 1 limits: no host sound / tint / accessory bridging — handle visuals in theme code.
+
+Scaffold:
+
+```bash
+node scripts/create-theme.js my-orbit --phaser
+```
+
+Built-in demo: Settings → Theme → **Phaser Orbit** (`themes/template-phaser`).
+
+**Sandbox packages contain executable code.** Only import themes you trust. Import shows a Code warning toast.
+
+---
+
 ## Install A Downloaded Theme
 
 A Clawd theme is a folder whose top level contains `theme.json`. The folder name is the theme id; the display name shown in Clawd comes from `theme.json.name`.
@@ -139,9 +202,25 @@ Override `rive.stateMachine`, `rive.inputs`, or `rive.stateLevels` only when you
 - Assets must live under `assets/` (basename only; no CDN URLs)
 - Switching between SVG and Rive themes reloads a different render entry (`index.html` ↔ `index-rive.html`)
 
+### Rive events (theme → Clawd) — v1 boundary
+
+Rive state machines can fire **events** from the `.riv` file (listeners / event
+reports). In Clawd **v1**, the pet Rive renderer drives **inputs only**
+(agent state, hover, pointer, click/bump via `rive.bindings` / legacy
+`inputs` + `stateLevels`).
+
+**Outbound Rive events are not consumed** as platform hooks yet: there is no
+stable mapping from a Rive event name to pet peek, sounds, or Settings
+actions. Themes must not rely on Clawd reacting to custom Rive events.
+
+If you need Clawd → theme signals today, use declared inputs/bindings. Game
+windows that embed `.riv` as an asset follow the game package rules
+([`package-import-routing.md`](./package-import-routing.md)); that path is
+separate from the pet Rive backend.
+
 ### Package & import
 
-Zip shape is the same as SVG themes. Settings → Theme → **Import Clawd theme package (.zip)** accepts `.riv` assets. A Rive import shows an untrusted-binary warning toast.
+Zip shape is the same as SVG themes. Settings → Theme → **Import Clawd theme package (.zip)** accepts `.riv` assets. A Rive import shows an untrusted-binary warning toast. Automatic theme-vs-game / SVG-vs-Rive routing: [`package-import-routing.md`](./package-import-routing.md).
 
 ## Creation Tiers
 

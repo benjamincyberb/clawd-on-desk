@@ -111,29 +111,61 @@ function createThemeFadeSequencer(options = {}) {
 
   function reloadAfterFade(seq, onReady, onFallback, options = {}) {
     if (!isCurrent(seq)) return;
-    const renderWin = getRenderWindow();
     const hitWin = getHitWindow();
-    if (!isLiveWindow(renderWin) || !isLiveWindow(hitWin)) {
+    if (!isLiveWindow(hitWin)) {
       if (typeof onFallback === "function") onFallback();
-      else setWindowOpacity(renderWin, restoreOpacity());
       return;
     }
 
     clearReloadListeners();
-    const renderContents = renderWin.webContents;
-    const hitContents = hitWin.webContents;
-    renderContents.once("did-finish-load", onReady);
-    hitContents.once("did-finish-load", onReady);
-    reloadListenerCleanup = () => {
-      renderContents.removeListener("did-finish-load", onReady);
-      hitContents.removeListener("did-finish-load", onReady);
-    };
     scheduleFadeFallback(seq, onFallback);
 
     try {
-      // Backend switch (SVG ↔ Rive): loadFile different HTML so CSP/entry match.
-      // Same-backend theme switch: keep reload() (cheaper, preserves entry).
-      if (typeof options.renderLoadFilePath === "string" && options.renderLoadFilePath) {
+      // Crossing sandbox boundary: webPreferences cannot change on an existing
+      // BrowserWindow — recreate via host callback, then bind load listeners
+      // to the NEW render window.
+      if (typeof options.recreateRenderWindow === "function") {
+        options.recreateRenderWindow();
+        const renderWin = getRenderWindow();
+        if (!isLiveWindow(renderWin)) {
+          if (typeof onFallback === "function") onFallback();
+          return;
+        }
+        const renderContents = renderWin.webContents;
+        const hitContents = hitWin.webContents;
+        renderContents.once("did-finish-load", onReady);
+        hitContents.once("did-finish-load", onReady);
+        reloadListenerCleanup = () => {
+          renderContents.removeListener("did-finish-load", onReady);
+          hitContents.removeListener("did-finish-load", onReady);
+        };
+        // Recreate already started loading — if it finished before we attached,
+        // count the render half as ready immediately.
+        if (typeof renderContents.isLoading === "function" && !renderContents.isLoading()) {
+          setTimeoutFn(() => onReady(), 0);
+        }
+        hitContents.reload();
+        return;
+      }
+
+      const renderWin = getRenderWindow();
+      if (!isLiveWindow(renderWin)) {
+        if (typeof onFallback === "function") onFallback();
+        else setWindowOpacity(renderWin, restoreOpacity());
+        return;
+      }
+      const renderContents = renderWin.webContents;
+      const hitContents = hitWin.webContents;
+      renderContents.once("did-finish-load", onReady);
+      hitContents.once("did-finish-load", onReady);
+      reloadListenerCleanup = () => {
+        renderContents.removeListener("did-finish-load", onReady);
+        hitContents.removeListener("did-finish-load", onReady);
+      };
+
+      if (typeof options.renderLoadUrl === "string" && options.renderLoadUrl) {
+        renderContents.loadURL(options.renderLoadUrl);
+      } else if (typeof options.renderLoadFilePath === "string" && options.renderLoadFilePath) {
         renderContents.loadFile(options.renderLoadFilePath);
       } else {
         renderContents.reload();
@@ -176,6 +208,8 @@ function createThemeFadeSequencer(options = {}) {
       if (!isCurrent(seq) || settled) return;
       reloadAfterFade(seq, onReady, () => finish("fallback"), {
         renderLoadFilePath: callbacks.renderLoadFilePath || null,
+        renderLoadUrl: callbacks.renderLoadUrl || null,
+        recreateRenderWindow: callbacks.recreateRenderWindow || null,
       });
     });
 

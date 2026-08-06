@@ -3,6 +3,8 @@
 // renderBackend "rive". Spike env (CLAWD_RIVE_SPIKE / CLAWD_RENDER_BACKEND=rive)
 // falls back to assets/source/rive/demo.riv when no theme file is configured.
 // Cursor arrives via pixi-cursor IPC (render window ignores mouse events).
+// Listener-based .riv files (e.g. isTracking gaze) need those coords replayed
+// onto the canvas as synthetic pointer events — the hit window owns real input.
 
 "use strict";
 
@@ -142,6 +144,33 @@ let activeBindings = [];
 // Apply a flat op list (from RiveBindings.computeInputOps) to the live state
 // machine. Each op targets an input by exact name; type is checked against the
 // real input so a mismatched declaration is skipped instead of throwing.
+function ensureRiveListeners() {
+  if (!riveInstance || typeof riveInstance.setupRiveListeners !== "function") return;
+  try { riveInstance.setupRiveListeners(); } catch {}
+}
+
+// Replay main-process cursor samples onto the Rive canvas so Listener-based
+// state machines (gaze / flip-on-click, etc.) track the global pointer.
+function dispatchCanvasPointer(type, localX, localY) {
+  if (!canvasEl || !ready) return;
+  const rect = canvasEl.getBoundingClientRect();
+  const clientX = rect.left + localX;
+  const clientY = rect.top + localY;
+  const isDown = type === "mousedown";
+  try {
+    canvasEl.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      screenX: clientX,
+      screenY: clientY,
+      button: 0,
+      buttons: isDown ? 1 : 0,
+    }));
+  } catch {}
+}
+
 function applyOps(ops) {
   if (!Array.isArray(ops)) return;
   for (const op of ops) {
@@ -318,6 +347,9 @@ function applyPointerToInputs() {
   hover = over || near;
 
   applyOps(computeOps("pointer"));
+  if (hasPointer) {
+    dispatchCanvasPointer("mousemove", pointerX, pointerY);
+  }
 
   if (fxEnabled() && hasPointer) {
     fxTrail.push({ x: pointerX, y: pointerY, age: 0, life: 0.35 });
@@ -460,7 +492,9 @@ function createRiveWithSm(riveApi, buffer, sm) {
         canvas: canvasEl,
         autoplay: true,
         stateMachines: sm,
-        shouldDisableRiveListeners: true,
+        // Listeners attach to the canvas; real OS pointer never hits it (hit
+        // window owns input). dispatchCanvasPointer replays pixi-cursor coords.
+        shouldDisableRiveListeners: false,
         layout: riveApi.Layout
           ? new riveApi.Layout({
             fit: riveApi.Fit ? riveApi.Fit.Contain : "contain",
@@ -553,6 +587,7 @@ async function boot(reason) {
   loadedAssetUrl = rivUrl;
   resizeCanvases();
   indexInputs();
+  ensureRiveListeners();
   activeBindings = resolveActiveBindings();
   ready = true;
   applyAgentState(pendingState);
@@ -615,9 +650,13 @@ if (window.electronAPI && typeof window.electronAPI.onPlayClickReaction === "fun
   window.electronAPI.onPlayClickReaction(() => {
     const w = canvasEl ? canvasEl.clientWidth : 128;
     const h = canvasEl ? canvasEl.clientHeight : 128;
+    const x = hasPointer ? pointerX : w * 0.5;
+    const y = hasPointer ? pointerY : h * 0.55;
     // Click reaction is theme-authored: fire whatever the theme bound to click.
+    dispatchCanvasPointer("mousedown", x, y);
+    dispatchCanvasPointer("mouseup", x, y);
     applyOps(computeOps("click"));
-    spawnBurst(hasPointer ? pointerX : w * 0.5, hasPointer ? pointerY : h * 0.55, 20, level === 2 ? 15 : 190);
+    spawnBurst(x, y, 20, level === 2 ? 15 : 190);
     setBadge(`Rive · ${displayName()} · click`);
   });
 }

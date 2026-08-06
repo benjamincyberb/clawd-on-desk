@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:">
+  <title>Phaser Starter</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0f1419; overflow: hidden; }
+    #game { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <!-- Vendor Phaser yourself: npm run vendor:phaser → copy into vendor/ -->
+  <script src="vendor/phaser.min.js"></script>
+  <script src="vendor/clawd-game-sdk.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

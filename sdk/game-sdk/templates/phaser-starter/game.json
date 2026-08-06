@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "name": "Phaser Starter",
+  "version": "1.0.0",
+  "author": "Clawd",
+  "description": "Minimal Phaser + clawd.game.v1 starter template",
+  "entry": "index.html",
+  "window": { "width": 720, "height": 480, "resizable": true },
+  "capabilities": {
+    "agentFeed": true,
+    "petEvents": false
+  },
+  "engine": "phaser"
+}

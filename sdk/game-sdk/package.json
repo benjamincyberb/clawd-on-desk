@@ -1,0 +1,14 @@
+{
+  "name": "@clawd/game-sdk",
+  "version": "1.0.0",
+  "description": "Official Clawd game bridge helpers (engine-neutral; Phaser-first templates)",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "license": "MIT",
+  "peerDependencies": {
+    "phaser": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "phaser": { "optional": true }
+  }
+}

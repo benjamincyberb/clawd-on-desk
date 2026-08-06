@@ -555,6 +555,9 @@ test("settings IPC imports Clawd user theme zip packages", async () => {
       themeId: "pixel-cat",
       name: "Pixel Cat",
       path: path.join(userThemesDir, "pixel-cat"),
+      renderBackend: "svg",
+      rive: false,
+      sandbox: false,
     });
     assert.deepStrictEqual(dialogParent, { id: "parent", sender: "sender-web-contents" });
     assert.deepStrictEqual(dialogOptions.properties, ["openFile"]);

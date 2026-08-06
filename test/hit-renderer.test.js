@@ -24,7 +24,7 @@ class FakeArea {
   setPointerCapture() {}
 }
 
-function createHarness({ isMac = false, sendState = {} } = {}) {
+function createHarness({ isMac = false, sendState = {}, reactions } = {}) {
   const apiCalls = [];
   const apiHandlers = {};
   const area = new FakeArea();
@@ -47,7 +47,7 @@ function createHarness({ isMac = false, sendState = {} } = {}) {
     document: fakeDocument,
     window: {
       hitPlatform: { isMac, platform: isMac ? "darwin" : "win32" },
-      hitThemeConfig: { reactions: {
+      hitThemeConfig: { reactions: reactions || {
         double: { file: "flail.svg", duration: 3500 },
         annoyed: { file: "annoyed.svg", duration: 3500 },
         clickLeft: { file: "left.svg", duration: 2500 },
@@ -129,6 +129,35 @@ describe("hit-renderer input layer", () => {
     const names = h.apiCalls.map((c) => c[0]);
     assert.ok(names.includes("revealSessionHud"), "should call revealSessionHud");
     assert.ok(!names.includes("focusTerminal"), "must not call focusTerminal");
+  });
+
+  it("sandbox reactions.click fires playClickReaction on single click", () => {
+    const h = createHarness({
+      reactions: { click: { file: "_sandbox", duration: 0 }, drag: { file: "_sandbox" } },
+    });
+    h.pointerup({});
+    const play = h.apiCalls.filter((c) => c[0] === "playClickReaction");
+    assert.strictEqual(play.length, 1);
+    assert.strictEqual(play[0][1], "_sandbox");
+    assert.ok(h.apiCalls.map((c) => c[0]).includes("revealSessionHud"));
+  });
+
+  it("sandbox reactions.click still fires while agent is working", () => {
+    const h = createHarness({
+      reactions: { click: { file: "_sandbox", duration: 0 } },
+      sendState: { currentState: "working", miniMode: false, dndEnabled: false },
+    });
+    h.pointerup({});
+    assert.ok(h.apiCalls.some((c) => c[0] === "playClickReaction" && c[1] === "_sandbox"));
+  });
+
+  it("sandbox reactions.click is gated by DND", () => {
+    const h = createHarness({
+      reactions: { click: { file: "_sandbox", duration: 0 } },
+      sendState: { currentState: "idle", miniMode: false, dndEnabled: true },
+    });
+    h.pointerup({});
+    assert.ok(!h.apiCalls.some((c) => c[0] === "playClickReaction"));
   });
 
   it("Ctrl+click on non-mac opens Dashboard, does NOT call reveal", () => {

@@ -1,6 +1,7 @@
 "use strict";
 
 const { normalizeRiveBindings } = require("./rive-bindings");
+const renderBackends = require("./render-backends");
 
 // Defaults used when theme.json omits optional fields.
 
@@ -81,7 +82,8 @@ const VISUAL_FALLBACK_STATES = new Set([
   "roam",
 ]);
 
-const RENDER_BACKENDS = new Set(["svg", "rive"]);
+const RENDER_BACKENDS = renderBackends.RENDER_BACKENDS;
+const DEFAULT_SANDBOX_ENGINE = "phaser";
 const DEFAULT_RIVE_STATE_LEVELS = {
   idle: 0,
   thinking: 1,
@@ -112,21 +114,22 @@ const DEFAULT_RIVE_STATE_MACHINES = [
 const MAX_RIVE_FILE_BYTES = 20 * 1024 * 1024;
 
 function resolveThemeRenderBackend(themeOrRaw) {
-  if (!themeOrRaw || typeof themeOrRaw !== "object") return "svg";
-  const explicit = typeof themeOrRaw.renderBackend === "string"
-    ? themeOrRaw.renderBackend.trim().toLowerCase()
-    : "";
-  if (explicit === "rive") return "rive";
-  if (explicit === "svg" || explicit === "pixi") return "svg";
-  // Infer from rive.file or .riv state bindings when author omits renderBackend.
-  if (isPlainObject(themeOrRaw.rive) && typeof themeOrRaw.rive.file === "string" && themeOrRaw.rive.file) {
-    return "rive";
-  }
-  const idleFiles = getStateFiles(themeOrRaw.states && themeOrRaw.states.idle);
-  if (idleFiles.some((f) => typeof f === "string" && f.toLowerCase().endsWith(".riv"))) {
-    return "rive";
-  }
-  return "svg";
+  return renderBackends.resolveThemeRenderBackend(themeOrRaw);
+}
+
+function normalizeSandboxConfig(rawSandbox, rawTheme) {
+  const backend = resolveThemeRenderBackend(rawTheme);
+  if (backend !== "sandbox") return null;
+  const src = isPlainObject(rawSandbox) ? rawSandbox : {};
+  let entry = typeof src.entry === "string" ? basenameOnly(src.entry) : "";
+  if (!entry) entry = "index.html";
+  const engineRaw = typeof src.engine === "string" ? src.engine.trim().toLowerCase() : "";
+  const engine = renderBackends.isSandboxEngine(engineRaw) ? engineRaw : DEFAULT_SANDBOX_ENGINE;
+  return {
+    entry,
+    engine,
+    network: src.network === true,
+  };
 }
 
 function normalizeRiveConfig(rawRive, rawTheme) {
@@ -230,7 +233,7 @@ function validateTheme(cfg) {
       ? cfg.renderBackend.trim().toLowerCase()
       : "";
     if (!RENDER_BACKENDS.has(backend)) {
-      errors.push(`renderBackend must be "svg" or "rive", got ${JSON.stringify(cfg.renderBackend)}`);
+      errors.push(`renderBackend must be "svg", "rive", or "sandbox", got ${JSON.stringify(cfg.renderBackend)}`);
     }
   }
 
@@ -258,6 +261,33 @@ function validateTheme(cfg) {
     }
   }
 
+  if (resolvedBackend === "sandbox") {
+    if (cfg.sandbox !== undefined && !isPlainObject(cfg.sandbox)) {
+      errors.push("sandbox must be an object when present");
+    }
+    const rawEntry = isPlainObject(cfg.sandbox) && typeof cfg.sandbox.entry === "string"
+      ? cfg.sandbox.entry.trim()
+      : "";
+    if (!rawEntry) {
+      errors.push('renderBackend "sandbox" requires sandbox.entry to be an .html file');
+    } else if (rawEntry.includes("/") || rawEntry.includes("\\") || rawEntry.includes("..")) {
+      errors.push("sandbox.entry must be a basename (no path separators or ..)");
+    } else if (!rawEntry.toLowerCase().endsWith(".html")) {
+      errors.push('renderBackend "sandbox" requires sandbox.entry to be an .html file');
+    }
+    if (isPlainObject(cfg.sandbox) && cfg.sandbox.engine !== undefined) {
+      const eng = typeof cfg.sandbox.engine === "string"
+        ? cfg.sandbox.engine.trim().toLowerCase()
+        : "";
+      if (eng && !renderBackends.isSandboxEngine(eng)) {
+        errors.push(`sandbox.engine must be one of ${renderBackends.SANDBOX_ENGINES.join(", ")}`);
+      }
+    }
+    if (cfg.eyeTracking && cfg.eyeTracking.enabled) {
+      errors.push('eyeTracking.enabled is not supported with renderBackend "sandbox"');
+    }
+  }
+
   if (cfg.eyeTracking && cfg.eyeTracking.enabled) {
     if (!Array.isArray(cfg.eyeTracking.states) || cfg.eyeTracking.states.length === 0) {
       errors.push("eyeTracking.states must be a non-empty array when eyeTracking.enabled=true");
@@ -265,7 +295,7 @@ function validateTheme(cfg) {
   }
 
   // eyeTracking.states listed states must use .svg if enabled (SVG backend only)
-  if (resolvedBackend !== "rive" && cfg.eyeTracking && cfg.eyeTracking.enabled && cfg.states) {
+  if (resolvedBackend === "svg" && cfg.eyeTracking && cfg.eyeTracking.enabled && cfg.states) {
     for (const stateName of (cfg.eyeTracking.states || [])) {
       const files = getStateFiles(cfg.states[stateName]).length > 0
         ? getStateFiles(cfg.states[stateName])
@@ -955,6 +985,7 @@ function buildCapabilities(cfg, options = {}) {
       isPlainObject(cfg && cfg.eyeTracking)
       && cfg.eyeTracking.enabled
       && hasNonEmptyArray(cfg.eyeTracking.states)
+      && !renderBackends.disablesSvgCustomization(resolveThemeRenderBackend(cfg))
     ),
     miniMode: isMiniSupported(cfg),
     idleAnimations: hasNonEmptyArray(cfg && cfg.idleAnimations),
@@ -967,6 +998,7 @@ function buildCapabilities(cfg, options = {}) {
     petTint: !!(
       isPlainObject(cfg && cfg.customization)
       && cfg.customization.petTint === true
+      && !renderBackends.disablesSvgCustomization(resolveThemeRenderBackend(cfg))
     ),
     accessories: deriveAccessoryCapability(cfg),
     meritCultivator,
@@ -981,8 +1013,13 @@ function addThemeAssetFile(out, filename) {
 
 function collectRequiredAssetFiles(theme) {
   const files = new Set();
-  for (const usage of projectThemeVisualUsages(theme)) {
-    addThemeAssetFile(files, usage.file);
+  const backend = resolveThemeRenderBackend(theme);
+  // Sandbox themes render via package entry HTML/JS — state visual files are
+  // state-machine placeholders and are not required assets.
+  if (backend !== "sandbox") {
+    for (const usage of projectThemeVisualUsages(theme)) {
+      addThemeAssetFile(files, usage.file);
+    }
   }
   if (theme && theme.rive && typeof theme.rive.file === "string") {
     addThemeAssetFile(files, theme.rive.file);
@@ -1144,6 +1181,37 @@ function mergeFileHitBoxes(base, patch) {
   };
 }
 
+// Rive artboards are usually 256×256 (or similar), not the Clawd SVG crab
+// coordinate system. Without an authored hitBoxes block, DEFAULT_HITBOXES
+// collapses to a ~13×9px click island — the pet looks "stuck" and cannot be
+// dragged. Prefer layout.contentBox, then the full viewBox.
+function deriveContentBoxHitBox(theme) {
+  const cb = theme && theme.layout && theme.layout.contentBox;
+  if (
+    cb
+    && Number.isFinite(cb.x) && Number.isFinite(cb.y)
+    && Number.isFinite(cb.width) && Number.isFinite(cb.height)
+    && cb.width > 0 && cb.height > 0
+  ) {
+    return { x: cb.x, y: cb.y, w: cb.width, h: cb.height };
+  }
+  const vb = theme && theme.viewBox;
+  if (
+    vb
+    && Number.isFinite(vb.x) && Number.isFinite(vb.y)
+    && Number.isFinite(vb.width) && Number.isFinite(vb.height)
+    && vb.width > 0 && vb.height > 0
+  ) {
+    return { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
+  }
+  return null;
+}
+
+/** @deprecated prefer deriveContentBoxHitBox — kept for existing tests/callers */
+function deriveRiveDefaultHitBox(theme) {
+  return deriveContentBoxHitBox(theme);
+}
+
 function mergeDefaults(raw, themeId, isBuiltin) {
   const theme = { ...raw, _id: themeId, _builtin: !!isBuiltin };
   // NOTE: This preserves pre-A1 behavior: some nested values are shallow-copied
@@ -1158,7 +1226,8 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     autoReturn: { ...DEFAULT_TIMINGS.autoReturn, ...(raw.timings && raw.timings.autoReturn) },
   };
 
-  // hitBoxes
+  // hitBoxes (SVG defaults first; Rive without authored hitBoxes is rewritten
+  // after layout/viewBox are known — see below).
   theme.hitBoxes = { ...DEFAULT_HITBOXES, ...(raw.hitBoxes || {}) };
   theme.fileHitBoxes = normalizeFileHitBoxes(raw.fileHitBoxes);
   // fileViewBoxes / miniMode.viewBox are layout metadata only and safe for external themes.
@@ -1171,8 +1240,9 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   theme.rendering = normalizeRendering(raw.rendering);
   theme.renderBackend = resolveThemeRenderBackend(raw);
   theme.rive = normalizeRiveConfig(raw.rive, { ...raw, renderBackend: theme.renderBackend });
-  // Rive themes cannot use SVG eye-tracking / tint / accessories in v1.
-  if (theme.renderBackend === "rive") {
+  theme.sandbox = normalizeSandboxConfig(raw.sandbox, { ...raw, renderBackend: theme.renderBackend });
+  // Rive / sandbox themes cannot use SVG eye-tracking / tint / accessories in v1.
+  if (renderBackends.disablesSvgCustomization(theme.renderBackend)) {
     theme.eyeTracking = {
       ...DEFAULT_EYE_TRACKING,
       enabled: false,
@@ -1183,7 +1253,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     petTint: !!(
       isPlainObject(raw.customization)
       && raw.customization.petTint === true
-      && theme.renderBackend !== "rive"
+      && !renderBackends.disablesSvgCustomization(theme.renderBackend)
     ),
     accessories: null,
   };
@@ -1223,8 +1293,20 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     theme.layout = null;
   }
 
-  // eyeTracking (already forced off for rive above)
-  if (theme.renderBackend !== "rive") {
+  // Rive / sandbox: replace clawd-sized DEFAULT_HITBOXES when the theme did not author any.
+  if (renderBackends.usesDerivedHitBoxes(theme.renderBackend) && !isPlainObject(raw.hitBoxes)) {
+    const derived = deriveContentBoxHitBox(theme);
+    if (derived) {
+      theme.hitBoxes = {
+        default: { ...derived },
+        sleeping: { ...derived },
+        wide: { ...derived },
+      };
+    }
+  }
+
+  // eyeTracking (already forced off for rive/sandbox above)
+  if (!renderBackends.disablesSvgCustomization(theme.renderBackend)) {
     theme.eyeTracking = { ...DEFAULT_EYE_TRACKING, ...(raw.eyeTracking || {}) };
     theme.eyeTracking.ids = {
       ...DEFAULT_EYE_TRACKING.ids,
@@ -1257,7 +1339,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
     theme.miniMode = { supported: false, states: {}, viewBox: null, timings: { minDisplay: {}, autoReturn: {} }, glyphFlips: {} };
   }
 
-  theme.customization.accessories = theme.renderBackend === "rive"
+  theme.customization.accessories = renderBackends.disablesSvgCustomization(theme.renderBackend)
     ? null
     : normalizeAccessoryAttachments(
       isPlainObject(raw.customization) ? raw.customization.accessories : undefined,
@@ -1369,6 +1451,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   if (Array.isArray(theme.wideHitboxFiles)) theme.wideHitboxFiles = theme.wideHitboxFiles.map(bn);
   if (Array.isArray(theme.sleepingHitboxFiles)) theme.sleepingHitboxFiles = theme.sleepingHitboxFiles.map(bn);
   if (theme.rive && theme.rive.file) theme.rive.file = bn(theme.rive.file);
+  if (theme.sandbox && theme.sandbox.entry) theme.sandbox.entry = bn(theme.sandbox.entry);
 
   return theme;
 }
@@ -1392,6 +1475,9 @@ module.exports = {
   MAX_RIVE_FILE_BYTES,
   resolveThemeRenderBackend,
   normalizeRiveConfig,
+  normalizeSandboxConfig,
+  deriveContentBoxHitBox,
+  deriveRiveDefaultHitBox,
   validateTheme,
   mergeDefaults,
   isPlainObject,

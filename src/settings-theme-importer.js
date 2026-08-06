@@ -89,10 +89,18 @@ function validateExtractedTheme({ fs, path, stagingDir, themeId }) {
   if (errors.length > 0) throw new Error(`theme.json validation failed: ${errors.join("; ")}`);
 
   const effective = mergeDefaults(raw, themeId, false);
-  const missingAssets = collectRequiredAssetFiles(effective)
-    .filter((filename) => !fs.existsSync(path.join(stagingDir, "assets", filename)));
-  if (missingAssets.length > 0) {
-    throw new Error(`theme zip is missing asset file${missingAssets.length === 1 ? "" : "s"}: ${missingAssets.join(", ")}`);
+  if (effective.renderBackend === "sandbox") {
+    const entry = (effective.sandbox && effective.sandbox.entry) || "index.html";
+    const entryPath = path.join(stagingDir, entry);
+    if (!fs.existsSync(entryPath)) {
+      throw new Error(`sandbox theme missing entry file: ${entry}`);
+    }
+  } else {
+    const missingAssets = collectRequiredAssetFiles(effective)
+      .filter((filename) => !fs.existsSync(path.join(stagingDir, "assets", filename)));
+    if (missingAssets.length > 0) {
+      throw new Error(`theme zip is missing asset file${missingAssets.length === 1 ? "" : "s"}: ${missingAssets.join(", ")}`);
+    }
   }
 
   // Untrusted binary: cap .riv size (same limit as theme-schema / renderer).
@@ -175,6 +183,7 @@ function importUserThemeZip(zipPath, options = {}) {
       path: targetDir,
       renderBackend,
       rive: renderBackend === "rive",
+      sandbox: renderBackend === "sandbox",
     };
   } catch (err) {
     fs.rmSync(stagingDir, { recursive: true, force: true });

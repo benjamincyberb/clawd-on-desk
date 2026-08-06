@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "name": "Flappy Bird",
+  "author": "Igor Rozani (Clawd port)",
+  "version": "1.0.0",
+  "description": "Classic Flappy Bird on the desk-pet window (Phaser 4). Based on https://github.com/IgorRozani/flappy-bird (MIT).",
+
+  "renderBackend": "sandbox",
+  "sandbox": {
+    "entry": "index.html",
+    "engine": "phaser",
+    "network": false
+  },
+
+  "customization": {
+    "petTint": false
+  },
+
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 288,
+    "height": 512
+  },
+
+  "layout": {
+    "contentBox": { "x": 0, "y": 0, "width": 288, "height": 512 },
+    "centerX": 144,
+    "baselineY": 480,
+    "visibleHeightRatio": 1,
+    "baselineBottomRatio": 0.06
+  },
+
+  "hitBoxes": {
+    "default": { "x": 0, "y": 0, "w": 288, "h": 512 },
+    "sleeping": { "x": 0, "y": 0, "w": 288, "h": 512 },
+    "wide": { "x": 0, "y": 0, "w": 288, "h": 512 }
+  },
+
+  "eyeTracking": {
+    "enabled": false,
+    "states": []
+  },
+
+  "states": {
+    "idle": ["_sandbox"],
+    "thinking": ["_sandbox"],
+    "working": ["_sandbox"],
+    "juggling": ["_sandbox"],
+    "error": { "fallbackTo": "attention" },
+    "attention": ["_sandbox"],
+    "notification": ["_sandbox"],
+    "sleeping": { "fallbackTo": "idle" },
+    "waking": ["_sandbox"]
+  },
+
+  "sleepSequence": {
+    "mode": "direct"
+  },
+
+  "reactions": {
+    "click": { "file": "_sandbox", "duration": 0 },
+    "drag": { "file": "_sandbox" }
+  }
+}

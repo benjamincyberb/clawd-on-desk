@@ -384,12 +384,41 @@ function canPlayReactionNow() {
   return currentState === "idle" && !dndEnabled && !isReacting;
 }
 
+// Sandbox / simple themes author reactions.click (often file "_sandbox").
+// Those must work on a single click, and while the agent is busy — otherwise
+// Phaser pets never receive pet:event "click" (render window is view-only).
+function isSandboxClickFile(file) {
+  return file === "_sandbox";
+}
+
+function canPlaySimpleClickNow(file) {
+  if (dndEnabled) return false;
+  if (isSandboxClickFile(file)) return !isReacting;
+  return canPlayReactionNow();
+}
+
 function handleClick(clientX) {
   if (miniMode) {
     window.hitAPI.exitMiniMode();
     return;
   }
   if (isDragReacting) return;
+
+  const clickReact = _getReaction("click");
+  const doubleReact = _getReaction("double");
+  const annoyedReact = _getReaction("annoyed");
+  const leftReact = _getReaction("clickLeft");
+  const rightReact = _getReaction("clickRight");
+  const simpleClickOnly = !!(clickReact && clickReact.file && !leftReact && !rightReact && !doubleReact);
+
+  // Immediate single-click path for sandbox / Rive-style reactions.click.
+  if (simpleClickOnly) {
+    window.hitAPI.revealSessionHud();
+    if (!canPlaySimpleClickNow(clickReact.file)) return;
+    const duration = Number.isFinite(clickReact.duration) ? clickReact.duration : 400;
+    playReaction(clickReact.file, duration);
+    return;
+  }
 
   clickCount++;
   if (clickCount === 1) {
@@ -400,11 +429,6 @@ function handleClick(clientX) {
   }
 
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-
-  const doubleReact = _getReaction("double");
-  const annoyedReact = _getReaction("annoyed");
-  const leftReact = _getReaction("clickLeft");
-  const rightReact = _getReaction("clickRight");
 
   if (clickCount >= 4 && doubleReact) {
     clickCount = 0;
@@ -425,6 +449,8 @@ function handleClick(clientX) {
       } else if (leftReact && rightReact) {
         const react = dir === "left" ? leftReact : rightReact;
         playReaction(react.file, react.duration || 2500);
+      } else if (clickReact && clickReact.file) {
+        playReaction(clickReact.file, clickReact.duration || 400);
       }
     }, CLICK_WINDOW_MS);
   } else {
@@ -432,16 +458,28 @@ function handleClick(clientX) {
       clickTimer = null;
       clickCount = 0;
       firstClickDir = null;
+      // Themes with only reactions.click already fired above; this branch is
+      // for mixed themes that also have poke/flail bindings — single click
+      // still delivers reactions.click after the accumulator window.
+      if (clickReact && clickReact.file && canPlaySimpleClickNow(clickReact.file)) {
+        playReaction(clickReact.file, clickReact.duration || 400);
+      }
     }, CLICK_WINDOW_MS);
   }
 }
 
 function playReaction(svg, duration) {
   if (!svg) return;
+  const ms = Math.max(0, Number(duration) || 0);
+  // Sandbox clicks must not lock out rapid flaps (game pets).
+  if (isSandboxClickFile(svg)) {
+    window.hitAPI.playClickReaction(svg, ms);
+    return;
+  }
   isReacting = true;
-  window.hitAPI.playClickReaction(svg, duration);
+  window.hitAPI.playClickReaction(svg, ms);
   // Local timer to ungate input after duration
-  setTimeout(() => { isReacting = false; }, duration);
+  setTimeout(() => { isReacting = false; }, ms);
 }
 
 // --- Drag reaction ---

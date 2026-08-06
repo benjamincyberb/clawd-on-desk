@@ -6,6 +6,7 @@ const { pathToFileURL } = require("url");
 const createThemeContext = require("./theme-context");
 const {
   resolveExternalAssetsDir: _resolveExternalAssetsDir,
+  resolveSandboxThemeRoot: _resolveSandboxThemeRoot,
   externalAssetsSourceDir: _externalAssetsSourceDir,
   isPathInsideDir: _isPathInsideDir,
 } = require("./theme-assets-cache");
@@ -245,8 +246,23 @@ function loadTheme(themeId, opts = {}) {
     theme._meritStageId = progressionStageId;
   }
 
-  // For external themes: sanitize SVGs + resolve asset paths
-  if (!isBuiltin) {
+  // For external themes: sanitize SVGs + resolve asset paths.
+  // Sandbox code themes skip SVG sanitization and mirror allowlisted files
+  // into theme-cache; the clawd-pet:// protocol root is that cache (or the
+  // package dir for built-ins).
+  if (theme.renderBackend === "sandbox") {
+    if (!isBuiltin) {
+      const sandboxRoot = _resolveSandboxThemeRoot(themeId, themeDir, { themeCacheDir });
+      theme._sandboxRoot = sandboxRoot;
+      theme._themeDir = sandboxRoot;
+      theme._assetsDir = sandboxRoot;
+      theme._assetsFileUrl = pathToFileURL(sandboxRoot).href;
+    } else {
+      theme._sandboxRoot = themeDir;
+      theme._assetsDir = themeDir;
+      theme._assetsFileUrl = null;
+    }
+  } else if (!isBuiltin) {
     const assetsDir = _resolveExternalAssetsDir(themeId, themeDir, { strict, themeCacheDir });
     theme._assetsDir = assetsDir;
     theme._assetsFileUrl = pathToFileURL(assetsDir).href;
@@ -458,6 +474,19 @@ function validateThemeShape(themeId, opts = {}) {
 
 function _validateRequiredAssets(theme) {
   const errors = [];
+  if (theme && theme.renderBackend === "sandbox") {
+    const entry = theme.sandbox && theme.sandbox.entry ? theme.sandbox.entry : "index.html";
+    const root = theme._sandboxRoot || theme._themeDir;
+    if (!root) {
+      errors.push("sandbox theme missing package root");
+    } else {
+      const entryPath = path.join(root, entry);
+      if (!fs.existsSync(entryPath)) {
+        errors.push(`missing sandbox entry: ${entry} (${entryPath})`);
+      }
+    }
+    return errors;
+  }
   for (const filename of _collectRequiredAssetFiles(theme)) {
     const absPath = _resolveAssetPath(theme, filename);
     if (!fs.existsSync(absPath)) {

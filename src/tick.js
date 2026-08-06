@@ -44,20 +44,21 @@ const RECENT_MOUSE_MS = 2000;
 const POINTER_BRIDGE_STATES = new Set(["idle", "mini-idle", "mini-peek"]);
 const LOW_POWER_PAUSE_STATES = new Set(["idle", "mini-idle", "dozing"]);
 const POINTER_BRIDGE_EPSILON = 0.001;
-// Cursor streaming for Pixi/Rive spikes and theme-selected Rive backends.
+// Cursor streaming for Pixi/Rive/Phaser spikes and sandbox / Rive theme backends.
+const {
+  resolveRuntimeRenderBackend,
+  needsCursorStream,
+} = require("./render-backends");
 function resolveSpikeRenderBackend() {
-  const explicit = String(process.env.CLAWD_RENDER_BACKEND || "").trim().toLowerCase();
-  if (explicit === "svg" || explicit === "pixi" || explicit === "rive") return explicit;
-  if (process.env.CLAWD_RIVE_SPIKE === "1") return "rive";
-  if (process.env.CLAWD_PIXI_SPIKE === "1") return "pixi";
-  return "svg";
+  return resolveRuntimeRenderBackend(
+    typeof ctx.getActiveTheme === "function" ? ctx.getActiveTheme() : null
+  );
 }
 function needsSpikeCursor() {
   const backend = resolveSpikeRenderBackend();
-  if (backend === "pixi" || backend === "rive") return true;
+  if (needsCursorStream(backend)) return true;
   if (typeof ctx.getRenderBackend === "function") {
-    const themeBackend = ctx.getRenderBackend();
-    return themeBackend === "rive" || themeBackend === "pixi";
+    return needsCursorStream(ctx.getRenderBackend());
   }
   return false;
 }
